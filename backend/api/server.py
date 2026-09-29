@@ -1,7 +1,12 @@
 """
-SOL AI HTTP REST API Server.
-Provides GET /api/health and POST /api/query endpoints.
-Uses Python standard library http.server for zero-dependency local execution.
+[DEPRECATED] SOL AI Legacy HTTP REST API Server.
+
+WARNING: This module is deprecated as of Phase 1 / Step 1 of the architecture roadmap.
+The primary API transport layer has migrated to Django (backend/sol_django).
+This legacy server is retained strictly as a fallback reference and for parity verification.
+
+To run the primary Django backend:
+    python backend/sol_django/manage.py runserver 0.0.0.0:8000
 """
 
 import os
@@ -209,6 +214,10 @@ class SOLAPIRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000):
+    print("\n" + "!" * 70)
+    print("[DEPRECATION WARNING] Running legacy http.server (backend/api/server.py).")
+    print("The production backend has migrated to Django: backend/sol_django")
+    print("!" * 70 + "\n")
     server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, SOLAPIRequestHandler)
     print("Pre-warming SOL AI Retrieval Engine...")

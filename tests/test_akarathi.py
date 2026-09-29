@@ -12,7 +12,12 @@ class TestThaniThamizhAkarathiAdapter(unittest.TestCase):
         query = "மனிதன்"
         evidences = self.adapter.lookup(query)
         self.assertIsInstance(evidences, list)
-        self.assertEqual(len(evidences), 1)
+        self.assertGreaterEqual(len(evidences), 2)
+
+        source_files = {e.metadata.get("source_file") for e in evidences}
+
+        self.assertIn("plain_text_dicts/Pav_Words.txt", source_files)
+        self.assertIn("search/ம/மனிதன்", source_files)
 
         ev = evidences[0]
         self.assertIsInstance(ev, Evidence)

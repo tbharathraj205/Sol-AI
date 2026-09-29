@@ -37,3 +37,6 @@ venv/
 data/processed/
 data/raw/
 
+# Local development artifacts
+response.json
+scratch/

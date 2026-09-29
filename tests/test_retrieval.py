@@ -35,10 +35,17 @@ class TestUnifiedRetrieval(unittest.TestCase):
         self.assertIn("Tamil WordNet", sources)
         self.assertIn("Sentamizh", sources)
 
-        # Akarathi returned NOT_FOUND and MUST NOT appear in cross_resource_support for 'மரம்' or 'மரங்களில்'
-        self.assertNotIn("Thani Thamizh Akarathi", result.cross_resource_support.get("மரங்களில்", []))
-        self.assertNotIn("Thani Thamizh Akarathi", result.cross_resource_support.get("மரம்", []))
-
+        # Akarathi does not directly match the inflected surface form,
+        # but it now provides evidence for the resolved lemma 'மரம்'.
+        self.assertNotIn(
+            "Thani Thamizh Akarathi",
+            result.cross_resource_support.get("மரங்களில்", [])
+        )
+        self.assertIn(
+            "Thani Thamizh Akarathi",
+            result.cross_resource_support.get("மரம்", [])
+        )
+        
     def test_literary_word_yaazh(self):
         """2. Test classical literary word (யாழ்)."""
         result = self.engine.search("யாழ்")
@@ -54,9 +61,9 @@ class TestUnifiedRetrieval(unittest.TestCase):
         self.assertIn("Sentamizh", sources)
         self.assertIn("ThamizhiMorph", sources)
 
-        # WordNet and Akarathi returned NOT_FOUND and MUST NOT appear in cross_resource_support
+        # WordNet is still not expected, but Akarathi now provides evidence.
         self.assertNotIn("Tamil WordNet", sources)
-        self.assertNotIn("Thani Thamizh Akarathi", sources)
+        self.assertIn("Thani Thamizh Akarathi", sources)
 
     def test_purist_dictionary_word_agathi(self):
         """3. Test purist dictionary word (அகதி)."""

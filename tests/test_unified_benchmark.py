@@ -35,7 +35,13 @@ class TestUnifiedBenchmark(unittest.TestCase):
             self.assertIsNotNone(result.normalized_query)
 
             # Every resource attempted
-            expected_resources = {"ThamizhiMorph", "Thani Thamizh Akarathi", "Tamil WordNet", "Sentamizh"}
+            expected_resources = {
+                "ThamizhiMorph",
+                "Thani Thamizh Akarathi",
+                "Tamil WordNet",
+                "Tamil Wiktionary",
+                "Sentamizh",
+            }
             for res in expected_resources:
                 self.assertIn(res, result.resource_summary)
 
