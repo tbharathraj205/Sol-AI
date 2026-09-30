@@ -9,6 +9,7 @@ from backend.resources.thamizhimorph import ThamizhiMorphAdapter
 from backend.resources.akarathi import ThaniThamizhAkarathiAdapter
 from backend.resources.wordnet import TamilWordNetAdapter
 from backend.resources.sentamizh import SentamizhAdapter
+from backend.resources.project_madurai import ProjectMaduraiExactAdapter
 from backend.retrieval.aggregator import EvidenceAggregator
 
 
@@ -16,7 +17,7 @@ class RetrievalEngine:
     """
     Unified Retrieval Engine for SOL AI.
     Coordinates multi-stage deterministic lookup across ThamizhiMorph, Thani Thamizh Akarathi,
-    Tamil WordNet, and Sentamizh adapters with fault-tolerant error boundaries.
+    Tamil WordNet, Sentamizh, and Project Madurai adapters with fault-tolerant error boundaries.
     """
 
     def __init__(
@@ -24,7 +25,8 @@ class RetrievalEngine:
         thamizhimorph: Optional[ThamizhiMorphAdapter] = None,
         akarathi: Optional[ThaniThamizhAkarathiAdapter] = None,
         wordnet: Optional[TamilWordNetAdapter] = None,
-        sentamizh: Optional[SentamizhAdapter] = None
+        sentamizh: Optional[SentamizhAdapter] = None,
+        project_madurai: Optional[ProjectMaduraiExactAdapter] = None
     ):
         """
         Initialize the Retrieval Engine with resource adapters.
@@ -34,6 +36,7 @@ class RetrievalEngine:
         self.akarathi = akarathi or ThaniThamizhAkarathiAdapter()
         self.wordnet = wordnet or TamilWordNetAdapter()
         self.sentamizh = sentamizh or SentamizhAdapter()
+        self.project_madurai = project_madurai or ProjectMaduraiExactAdapter()
         
         # Lazy load Wiktionary so it doesn't fail if the db is still building
         try:
@@ -47,7 +50,8 @@ class RetrievalEngine:
             "Tamil Wiktionary": self.wiktionary,
             "Thani Thamizh Akarathi": self.akarathi,
             "Tamil WordNet": self.wordnet,
-            "Sentamizh": self.sentamizh
+            "Sentamizh": self.sentamizh,
+            "Project Madurai": self.project_madurai
         }
         # Remove any None adapters
         self.adapters = {k: v for k, v in self.adapters.items() if v is not None}
@@ -121,7 +125,8 @@ class RetrievalEngine:
             "Tamil Wiktionary": self.wiktionary,
             "Thani Thamizh Akarathi": self.akarathi,
             "Tamil WordNet": self.wordnet,
-            "Sentamizh": self.sentamizh
+            "Sentamizh": self.sentamizh,
+            "Project Madurai": self.project_madurai
         }
         secondary_adapters = {k: v for k, v in secondary_adapters.items() if v is not None}
 
@@ -133,6 +138,9 @@ class RetrievalEngine:
                     evs = adapter.lookup(lemma)
                     # Filter out NOT_FOUND responses for secondary candidate lemma queries
                     found_evs = [e for e in evs if e.metadata.get("status") == "FOUND"]
+                    for e in found_evs:
+                        if e.lemma is None:
+                            e.lemma = lemma
                     add_evidence(found_evs)
                 except Exception as e:
                     # Do not overwrite primary error if secondary lookup fails

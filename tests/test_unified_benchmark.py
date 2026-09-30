@@ -41,6 +41,7 @@ class TestUnifiedBenchmark(unittest.TestCase):
                 "Tamil WordNet",
                 "Tamil Wiktionary",
                 "Sentamizh",
+                "Project Madurai",
             }
             for res in expected_resources:
                 self.assertIn(res, result.resource_summary)

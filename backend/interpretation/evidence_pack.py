@@ -11,6 +11,14 @@ from backend.interpretation.schemas import EvidencePack
 from backend.interpretation.context_selector import SentamizhContextSelector
 
 
+LITERARY_EVIDENCE_TYPES = {
+    "literary",
+    "corpus",
+    "citation",
+    "literary_context",
+}
+
+
 def _morphology_sort_key(ev: Evidence) -> int:
     """
     Priority order for morphology evidence:
@@ -68,7 +76,7 @@ def build_evidence_pack(
         # Categorize
         if src == "ThamizhiMorph" or ev_type == "morphology" or "fst_model" in ev.metadata:
             morphology_evs.append(ev)
-        elif src == "Sentamizh" or ev_type in ["literary", "corpus", "citation"]:
+        elif ev_type in LITERARY_EVIDENCE_TYPES:
             raw_literary_evs.append(ev)
         elif src in ["Thani Thamizh Akarathi", "Tamil WordNet"] or ev_type in ["lexical", "gloss", "sense"]:
             if ev.metadata.get("type") == "morphtable":

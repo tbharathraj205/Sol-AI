@@ -102,7 +102,7 @@ class EvidenceAggregator:
 
         # 5. Resource Summary Statistics
         resource_summary: Dict[str, Dict[str, Any]] = {}
-        resources_list = ["ThamizhiMorph", "Thani Thamizh Akarathi", "Tamil WordNet", "Tamil Wiktionary", "Sentamizh"]
+        resources_list = ["ThamizhiMorph", "Thani Thamizh Akarathi", "Tamil WordNet", "Tamil Wiktionary", "Sentamizh", "Project Madurai"]
 
         for res in resources_list:
             res_evs = [e for e in sorted_evidence if e.source == res]
