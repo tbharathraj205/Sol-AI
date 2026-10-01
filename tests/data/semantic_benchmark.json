@@ -1,0 +1,197 @@
+[
+  {
+    "query": "மரம்",
+    "category": "exact_lexical",
+    "gold_chunk_ids": [
+      "PM-TK-0216",
+      "PM-TK-0600"
+    ],
+    "relevance_rationale": "Exact classical occurrences of the base noun 'மரம்' in Tirukkural discussing fruitful tree and wooden nature."
+  },
+  {
+    "query": "அறம்",
+    "category": "exact_lexical",
+    "gold_chunk_ids": [
+      "PM-AATHI-0002",
+      "PM-TK-0035"
+    ],
+    "relevance_rationale": "Exact classical occurrences of 'அறம்' in Aathichudi ('அறம் செய விரும்பு') and Tirukkural definition of virtue."
+  },
+  {
+    "query": "இனிது",
+    "category": "exact_lexical",
+    "gold_chunk_ids": [
+      "PM-TK-0066",
+      "PM-TK-0068"
+    ],
+    "relevance_rationale": "Exact classical occurrences of 'இனிது' (sweet/pleasant) in Tirukkural verses on children's speech and wisdom."
+  },
+  {
+    "query": "யாழ்",
+    "category": "exact_lexical",
+    "gold_chunk_ids": [
+      "PM-TK-0066",
+      "PM-TK-0279"
+    ],
+    "relevance_rationale": "Exact classical occurrences of 'யாழ்' (ancient Tamil lute/harp) in Tirukkural musical and conduct comparisons."
+  },
+  {
+    "query": "பாரதி",
+    "category": "exact_lexical",
+    "gold_chunk_ids": [
+      "PM-SILAP_PUGAR-0178",
+      "PM-SILAP_PUGAR-0380"
+    ],
+    "relevance_rationale": "Exact classical occurrences of 'பாரதி' (classical dramatic dance/composition) in Silappadikaram."
+  },
+  {
+    "query": "மரங்களில்",
+    "category": "morphological_inflection",
+    "gold_chunk_ids": [
+      "PM-TK-0216",
+      "PM-TK-0600"
+    ],
+    "relevance_rationale": "Locative/plural inflection 'மரங்களில்' (in trees) testing semantic proximity to base noun passages containing 'மரம்'."
+  },
+  {
+    "query": "மரத்தால்",
+    "category": "morphological_inflection",
+    "gold_chunk_ids": [
+      "PM-TK-0216",
+      "PM-TK-0879"
+    ],
+    "relevance_rationale": "Instrumental case inflection 'மரத்தால்' (by/with tree) testing semantic retrieval when surface suffix differs."
+  },
+  {
+    "query": "மரத்தின்",
+    "category": "morphological_inflection",
+    "gold_chunk_ids": [
+      "PM-NALVAZHI-0034",
+      "PM-TK-0216"
+    ],
+    "relevance_rationale": "Genitive/oblique inflection 'மரத்தின்' (of the tree) matching classical occurrences in Nalvazhi and Tirukkural."
+  },
+  {
+    "query": "அறத்தின்",
+    "category": "morphological_inflection",
+    "gold_chunk_ids": [
+      "PM-TK-0031",
+      "PM-TK-0035"
+    ],
+    "relevance_rationale": "Genitive inflection 'அறத்தின்' (of virtue) matching Tirukkural 'அறத்தினூஉங்கு ஆக்கம்' and 'அறன்வலியுறுத்தல்'."
+  },
+  {
+    "query": "நற்பண்புகள் மற்றும் ஒழுக்கம்",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0035",
+      "PM-AATHI-0002"
+    ],
+    "relevance_rationale": "Modern conceptual query on virtue and moral discipline mapping to Tirukkural definition of virtue without envy/greed and Aathichudi ethical aphorism."
+  },
+  {
+    "query": "துன்பத்தில் உதவும் உற்ற தோழன்",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0788",
+      "PM-TK-0781"
+    ],
+    "relevance_rationale": "Paraphrase of a true friend helping in times of distress, matching Tirukkural couplets comparing friendship to slipping attire and rare shield."
+  },
+  {
+    "query": "வாழ்க்கையின் நிலையற்ற தன்மை",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0331",
+      "PM-TK-0336"
+    ],
+    "relevance_rationale": "Conceptual query on the impermanence of mortal life matching Tirukkural chapter on நிலையாமை (impermanence)."
+  },
+  {
+    "query": "காதலியின் இன்பம் மற்றும் அழகு",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-1101",
+      "PM-TK-1121"
+    ],
+    "relevance_rationale": "Thematic query on romantic ecstasy and the beloved's grace matching Tirukkural Kamattupal stanzas."
+  },
+  {
+    "query": "மழையின் சிறப்பும் இயற்கை வளமும்",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0011",
+      "PM-TK-0012",
+      "PM-TK-0014"
+    ],
+    "relevance_rationale": "Thematic query on the grace of rain sustaining earthly life matching Tirukkural 'வான்சிறப்பு' chapter."
+  },
+  {
+    "query": "மன்னனின் கடமையும் சிறந்த ஆட்சியும்",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0381",
+      "PM-TK-0386"
+    ],
+    "relevance_rationale": "Thematic query on royal duty, just governance, and accessible kingship matching Tirukkural 'இறைமாட்சி'."
+  },
+  {
+    "query": "காரணமின்றி செய்யும் பேருதவி",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0101",
+      "PM-TK-0103"
+    ],
+    "relevance_rationale": "Conceptual query on selfless assistance rendered without expectation of return matching Tirukkural 'செய்ந்நன்றி அறிதல்'."
+  },
+  {
+    "query": "கல்வியின் பெருமையும் கற்கும் முறையும்",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0391",
+      "PM-TK-0392"
+    ],
+    "relevance_rationale": "Conceptual query on the power of flawless learning and literacy as the two eyes of life matching Tirukkural 'கல்வி'."
+  },
+  {
+    "query": "பிறருக்கு தீங்கு செய்யாத நல்ல நடத்தை",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-0311",
+      "PM-TK-0312"
+    ],
+    "relevance_rationale": "Conceptual query on non-harming (Ahimsa) and ethical conduct matching Tirukkural 'இன்னாசெய்யாமை'."
+  },
+  {
+    "query": "தலைவனின் பிரிவும் பிரிவுத் துயரும்",
+    "category": "conceptual_paraphrastic",
+    "gold_chunk_ids": [
+      "PM-TK-1151"
+    ],
+    "relevance_rationale": "Poetic Sangam theme of the sorrow of separation from the beloved matching Tirukkural 'பிரிவாற்றாமை' / 'கற்பியல்'."
+  },
+  {
+    "query": "குவாண்டம் கணினி மற்றும் செயற்கை நுண்ணறிவு வழிமுறைகள்",
+    "category": "negative_out_of_domain",
+    "gold_chunk_ids": [],
+    "relevance_rationale": "Out-of-domain modern technical query (quantum computing & AI algorithms) which has no legitimate counterpart in classical Tamil literature."
+  },
+  {
+    "query": "விமான நிலைய பாதுகாப்பு மற்றும் மின்னணு கடவுச்சீட்டு",
+    "category": "negative_out_of_domain",
+    "gold_chunk_ids": [],
+    "relevance_rationale": "Out-of-domain modern query (airport security & biometric passports) completely absent from classical corpus."
+  },
+  {
+    "query": "மைக்ரோசாப்ட் விண்டோஸ் இயக்க முறைமை நிறுவல்",
+    "category": "negative_out_of_domain",
+    "gold_chunk_ids": [],
+    "relevance_rationale": "Out-of-domain technical operating system setup query with zero classical relevance."
+  },
+  {
+    "query": "பங்குச் சந்தை முதலீடு மற்றும் பணவீக்க விகிதம்",
+    "category": "negative_out_of_domain",
+    "gold_chunk_ids": [],
+    "relevance_rationale": "Out-of-domain modern macroeconomic query (stock market investment & inflation rate) absent from classical corpus."
+  }
+]
