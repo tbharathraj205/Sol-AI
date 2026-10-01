@@ -399,5 +399,203 @@ class TestProjectMaduraiIntegration(unittest.TestCase):
         self.assertIn("ThamizhiMorph", sources)
 
 
+class TestProjectMaduraiRebuildCorrections(unittest.TestCase):
+    """
+    Regression Test Suite A through J for Step 2F Rebuild & Ingestion Corrections.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.project_root = Path(__file__).resolve().parents[1]
+        cls.db_path = cls.project_root / "data" / "processed" / "madurai_exact.db"
+        cls.engine = RetrievalEngine()
+        cls.conn = sqlite3.connect(cls.db_path)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.conn.close()
+
+    def test_a_iniyavai_mapping(self):
+        """Test A: INIYAVAI maps to Iniyavai Narpathu (PM0025) by Boothanchendanar, not Bharathiyar."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT chunk_id, release_no, author, work, original_text FROM chunks WHERE chunk_id LIKE 'PM-INIYAVAI%'")
+        rows = cur.fetchall()
+
+        self.assertGreater(len(rows), 0, "No chunks found for INIYAVAI")
+        self.assertLessEqual(len(rows), 50, f"Expected ~44 chunks for INIYAVAI, found {len(rows)}")
+
+        for chunk_id, release_no, author, work, original_text in rows:
+            self.assertEqual(release_no, "PM0025", f"Expected PM0025, got {release_no} in {chunk_id}")
+            self.assertIn("பூதஞ்சேந்தனார்", author, f"Unexpected author {author} in {chunk_id}")
+            self.assertEqual(work, "இனியவை நாற்பது", f"Unexpected work {work} in {chunk_id}")
+            self.assertNotIn("பாரதியார்", original_text)
+            self.assertNotIn("சுப்பிரமணிய", original_text)
+            self.assertNotIn("ஞானப் பாடல்கள்", original_text)
+
+        all_text = " ".join(r[4] for r in rows)
+        self.assertIn("கண்மூன் றுடையான்தாள் சேர்தல் கடிதினிதே", all_text)
+        self.assertIn("பிச்சைபுக் காயினுங் கற்றல் மிகஇனிதே", all_text)
+
+    def test_b_bharathiyar_mapping(self):
+        """Test B: BHARATHI_2 maps to PM0021 (Gnanap Padalkal) and BHARATHI maps to PM0049."""
+        cur = self.conn.cursor()
+        # Verify BHARATHI_2
+        cur.execute("SELECT chunk_id, release_no, author, work FROM chunks WHERE chunk_id LIKE 'PM-BHARATHI_2%'")
+        rows2 = cur.fetchall()
+        self.assertGreater(len(rows2), 400)
+        for chunk_id, release_no, author, work in rows2:
+            self.assertEqual(release_no, "PM0021")
+            self.assertEqual(author, "சி. சுப்பிரமணிய பாரதியார்")
+            self.assertEqual(work, "பாரதியார் பாடல்கள் (பாகம் 2)")
+
+        # Verify BHARATHI
+        cur.execute("SELECT chunk_id, release_no, author, work FROM chunks WHERE chunk_id LIKE 'PM-BHARATHI-%'")
+        rows1 = cur.fetchall()
+        self.assertGreater(len(rows1), 400)
+        for chunk_id, release_no, author, work in rows1:
+            self.assertEqual(release_no, "PM0049")
+            self.assertEqual(author, "சி. சுப்பிரமணிய பாரதியார்")
+            self.assertEqual(work, "பாரதியார் பாடல்கள்")
+
+    def test_c_tirukkural_verses_and_zero_english_boilerplate(self):
+        """Test C: Tirukkural has 1330 canonical couplets with zero shift and no English header boilerplate."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT chunk_id, stanza_number, original_text FROM chunks WHERE chunk_id LIKE 'PM-TK-%' ORDER BY stanza_number ASC")
+        rows = cur.fetchall()
+
+        self.assertEqual(len(rows), 1330, f"Expected exactly 1330 Tirukkural chunks, got {len(rows)}")
+
+        tk_dict = {r[1]: r[2] for r in rows}
+
+        # Kural 1
+        self.assertIn("அகர முதல எழுத்தெல்லாம் ஆதி", tk_dict[1])
+        self.assertIn("பகவன் முதற்றே உலகு.", tk_dict[1])
+
+        # Kural 2
+        self.assertIn("கற்றதனால் ஆய பயனென்கொல் வாலறிவன்", tk_dict[2])
+        self.assertIn("நற்றாள் தொழாஅர் எனின்.", tk_dict[2])
+
+        # Kural 10
+        self.assertIn("பிறவிப் பெருங்கடல் நீந்துவர் நீந்தார்", tk_dict[10])
+        self.assertIn("இறைவன் அடிசேரா தார்.", tk_dict[10])
+
+        # Kural 100
+        self.assertIn("இனிய உளவாக இன்னாத கூறல்", tk_dict[100])
+        self.assertIn("கனிஇருப்பக் காய்கவர்ந் தற்று.", tk_dict[100])
+
+        # Kural 500
+        self.assertIn("காலாழ் களரில் நரியடும் கண்ணஞ்சா", tk_dict[500])
+
+        # Kural 1000
+        self.assertIn("பண்பிலான் பெற்ற பெருஞ்செல்வம் நன்பால்", tk_dict[1000])
+
+        # Kural 1330
+        self.assertIn("ஊடுதல் காமத்திற்கு இன்பம் அதற்கின்பம்", tk_dict[1330])
+        self.assertIn("கூடி முயங்கப் பெறின்.", tk_dict[1330])
+
+        # Zero English boilerplate in TK chunks
+        for st_num, text in tk_dict.items():
+            self.assertNotIn("Project Madurai", text)
+            self.assertNotIn("In Tamil script", text)
+            self.assertNotIn("unicode format", text)
+            self.assertNotIn("Prepared by", text)
+
+    def test_d_aathichudi_full_inventory(self):
+        """Test D: Aathichudi has full inventory (1 invocation + 109 aphorisms = 110 chunks)."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT chunk_id, stanza_number, original_text FROM chunks WHERE chunk_id LIKE 'PM-AATHI-%' ORDER BY stanza_number ASC")
+        rows = cur.fetchall()
+
+        self.assertEqual(len(rows), 110, f"Expected 110 Aathichudi chunks, got {len(rows)}")
+
+        # First aphorism (PM-AATHI-0002)
+        self.assertIn("அறம் செய விரும்பு.", rows[1][2])
+
+        # Middle aphorisms
+        all_text = " ".join(r[2] for r in rows)
+        self.assertIn("தீவினை அகற்று", all_text)
+        self.assertIn("நூல் பல கல்", all_text)
+
+        # Last aphorism (PM-AATHI-0110)
+        self.assertIn("ஓரம் சொல்லேல்.", rows[109][2])
+
+    def test_e_konrai_vendhan_full_inventory(self):
+        """Test E: Konrai Vendhan has full inventory (1 invocation + 91 aphorisms = 92 chunks)."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT chunk_id, stanza_number, original_text FROM chunks WHERE chunk_id LIKE 'PM-KONRAI-%' ORDER BY stanza_number ASC")
+        rows = cur.fetchall()
+
+        self.assertEqual(len(rows), 92, f"Expected 92 Konrai Vendhan chunks, got {len(rows)}")
+
+        # First aphorism (PM-KONRAI-0002)
+        self.assertIn("அன்னையும் பிதாவும் முன்னறி தெய்வம்.", rows[1][2])
+
+        # Last aphorism (PM-KONRAI-0092)
+        self.assertIn("ஓதாதார்க்கு இல்லை உணர்வொடும் ஒழுக்கம்.", rows[91][2])
+
+    def test_f_canto_heading_false_positives(self):
+        """Test F: General Tamil words like இயல்பானான், இயல்வது, பகுதி are not falsely parsed as cantos."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM chunks WHERE canto LIKE '%இயல்பானான்%' OR canto LIKE '%இயல்வது%' OR canto LIKE '%பகுதியைக்%'")
+        count = cur.fetchone()[0]
+        self.assertEqual(count, 0, f"Found {count} chunks with false canto headings")
+
+    def test_g_boilerplate_filtering(self):
+        """Test G: Web navigation links, donor/volunteer acknowledgements are excluded from chunks."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM chunks WHERE original_text LIKE '%உள்ளுறை அட்டவணைக்குத் திரும்ப%' OR original_text LIKE '%Project Madurai is an open%'")
+        count = cur.fetchone()[0]
+        self.assertEqual(count, 0, f"Found {count} chunks with boilerplate")
+
+    def test_h_literary_units_preservation(self):
+        """Test H: Multi-line poetic forms (Naladiyar venbas, Tiruppavai pasurams) are preserved as cohesive stanzas."""
+        cur = self.conn.cursor()
+
+        # Naladiyar quatrain venba
+        cur.execute("SELECT original_text FROM chunks WHERE chunk_id = 'PM-NALADI-0009'")
+        naladi_text = cur.fetchone()[0]
+        self.assertEqual(len(naladi_text.splitlines()), 4, "Naladiyar venba should be preserved as 4 lines")
+
+        # Tiruppavai 8-line pasuram
+        cur.execute("SELECT original_text FROM chunks WHERE chunk_id = 'PM-THIRUPPAVAI-0005'")
+        tiruppavai_text = cur.fetchone()[0]
+        self.assertGreaterEqual(len(tiruppavai_text.splitlines()), 8, "Tiruppavai pasuram should be preserved as 8+ lines")
+
+    def test_i_fts_parity_and_count(self):
+        """Test I: Chunks table and FTS5 index have exact parity, and corpus contains 35 works."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT count(*) FROM chunks")
+        chunks_count = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM chunks_fts")
+        fts_count = cur.fetchone()[0]
+        cur.execute("SELECT count(DISTINCT work) FROM chunks")
+        works_count = cur.fetchone()[0]
+
+        self.assertEqual(chunks_count, fts_count, "Chunks and FTS5 row counts must match")
+        self.assertEqual(works_count, 35, "Corpus must contain 35 distinct works")
+        self.assertGreaterEqual(chunks_count, 14000)
+
+    def test_j_retrieval_integrity(self):
+        """Test J: End-to-end exact retrieval works for representative queries across repaired works."""
+        # Query 1: Aathichudi / Dharma
+        res_aram = self.engine.search("அறம்")
+        pm_aram = [e for e in res_aram.evidence if e.source == "Project Madurai" and e.metadata.get("status") == "FOUND"]
+        self.assertGreater(len(pm_aram), 0)
+        works_aram = {e.work for e in pm_aram}
+        self.assertTrue(any("ஆத்திசூடி" in w or "திருக்குறள்" in w for w in works_aram))
+
+        # Query 2: Iniyavai Narpathu
+        res_iniya = self.engine.search("இனிது")
+        pm_iniya = [e for e in res_iniya.evidence if e.source == "Project Madurai" and e.metadata.get("status") == "FOUND"]
+        self.assertGreater(len(pm_iniya), 0)
+        works_iniya = {e.work for e in pm_iniya}
+        self.assertIn("இனியவை நாற்பது", works_iniya)
+
+        # Query 3: Bharathiyar
+        res_bharathi = self.engine.search("பாரதி")
+        pm_bharathi = [e for e in res_bharathi.evidence if e.source == "Project Madurai" and e.metadata.get("status") == "FOUND"]
+        self.assertGreater(len(pm_bharathi), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

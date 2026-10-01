@@ -63,21 +63,30 @@ def normalize_tamil_text(text: str) -> str:
 
 def clean_html_tags(html_str: str) -> str:
     """
-    Clean HTML markup from Project Madurai e-texts while preserving line breaks.
+    Clean HTML markup from Project Madurai e-texts while preserving line breaks and stanza structure.
+    Handles both raw HTML e-texts (where <br> and block tags define line breaks)
+    and plain text snippets (preserving existing newlines).
     """
-    html_str = html_str.replace('&nbsp;', ' ')
-    html_str = html_str.replace('&copy;', '(c)')
-    html_str = html_str.replace('&amp;', '&')
-    html_str = html_str.replace('&quot;', '"')
-    html_str = html_str.replace('&lt;', '<')
-    html_str = html_str.replace('&gt;', '>')
-    # Turn <br> into \n
-    text = re.sub(r'<br\s*/?>', '\n', html_str, flags=re.I)
-    # Turn paragraph and header tags into \n\n
-    text = re.sub(r'</?(?:p|h[1-6]|tr|div|center|font|ul|li)[^>]*>', '\n\n', text, flags=re.I)
-    # Strip remaining HTML tags
+    if not html_str:
+        return ""
+
+    text = html_str.replace('&nbsp;', ' ').replace('&copy;', '(c)').replace('&amp;', '&').replace('&quot;', '"').replace('&lt;', '<').replace('&gt;', '>')
+    text = re.sub(r'<!--.*?-->', '', text, flags=re.S)
+    text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.I | re.S)
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.I | re.S)
+
+    has_html_breaks = bool(re.search(r'<(?:br|p|div|h[1-6]|tr|center)[^>]*>', text, re.I))
+    if has_html_breaks:
+        text = re.sub(r'[\r\n]+', ' ', text)
+        text = re.sub(r'(?:<br\s*/?>\s*){2,}', '\n\n', text, flags=re.I)
+        text = re.sub(r'</?(?:p|h[1-6]|tr|div|center|font|ul|li|hr|table|blockquote)[^>]*>', '\n\n', text, flags=re.I)
+        text = re.sub(r'<br\s*/?>', '\n', text, flags=re.I)
+    else:
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+
     text = re.sub(r'<[^>]+>', ' ', text)
-    return text
+    text = re.sub(r'\n[ \t]*\n+', '\n\n', text)
+    return text.strip()
 
 
 def fetch_source_file(
@@ -115,14 +124,14 @@ def fetch_source_file(
 def slice_work_section(text: str, work_id: str, title: str) -> str:
     """
     Extract specific sub-work text when multiple works are bundled in a single file
-    (e.g., PM0002 containing Aathichudi, Konrai Vendhan, Moodhurai, Nalvazhi).
+    (e.g., PM0002 containing Aathichudi, Konrai Vendhan, Moodhurai, Nalvazhi; PM0025 containing Iniyavai Narpathu).
     """
-    # Specific section markers for bundled releases
     section_map = {
         "AATHI": ("1.  ஆத்திசூடி", "2.  கொன்றை வேந்தன்"),
         "KONRAI": ("2.  கொன்றை வேந்தன்", "3.  மூதுரை"),
         "MOODHURAI": ("3.  மூதுரை", "4.  நல்வழி"),
         "NALVAZHI": ("4.  நல்வழி", None),
+        "INIYAVAI": ("இனியவை நாற்பது : பூதஞ்சேந்தனார்", "3.  களவழி நாற்பது"),
         "ELATHI": ("2. கணிமேதையார் அருளிய", "3. காரியாசான்"),
         "SIRUPANCHA": ("3. காரியாசான்", "சிறுபஞ்சமூலம் முற்றிற்று"),
         "THIRUPPALLANDU": ("பெரியாழ்வார் அருளிச்செய்த   திருப்பல்லாண்டு", "பெரியாழ்வார் திருமொழி"),
@@ -142,14 +151,113 @@ def slice_work_section(text: str, work_id: str, title: str) -> str:
     return text
 
 
+def is_boilerplate(b: str, work_title: str = "") -> bool:
+    """
+    Identify and exclude Project Madurai website navigation links, TOC controls,
+    contributor acknowledgements, typist credits, and web boilerplate.
+    Conservative: preserves legitimate literary colophons and invocations.
+    """
+    b_norm = re.sub(r'[\u200B-\u200D\uFEFF]', '', b).strip()
+
+    if any(k in b_norm.lower() for k in [
+        "in tamil script", "unicode format", "unicode encoding", "unicode/utf-8", "utf-8 format"
+    ]):
+        return True
+
+    if "Project Madurai" in b_norm or "மதுரைத் திட்டம்" in b_norm:
+        return True
+
+    if any(k in b_norm for k in [
+        "உள்ளுறை அட்டவணைக்குத் திரும்ப",
+        "அட்டவணைக்குத் திரும்ப",
+        "இம்மின்னுரை",
+        "மின்னூலாக்கம்",
+        "உரிமை - பொதுக் களம்",
+        "இப்பதிவினைச் செய்தவர்கள்",
+        "கி.ஆ.பெ.விசுவநாதம்",
+        "Our Sincere thanks go to",
+        "Our sincere thanks go to",
+        "Sincere thanks go to",
+        "This webpage presents",
+        "This page was first put up",
+        "To view the Tamil text correctly",
+        "Unicode fonts containing Tamil Block",
+        "Feel free to send the corrections",
+        "send the corrections by email",
+        "In case of difficulties send an email",
+        "தட்டச்சு செய்தவர்",
+        "பிழை திருத்தியவர்",
+        "சரிபார்த்தவர்",
+    ]):
+        return True
+
+    if re.match(r'^இத்தலம்\s+[\u0B80-\u0BFF\s]+நாட்டிலுள்ளது\s*\.?$', b_norm):
+        return True
+
+    if b_norm in ["உள்ளடக்கம்", "பொருளடக்கம்", "பொருள் அடக்கம்", "உள்ளுறை", "பொருளடக்கம்:"]:
+        return True
+
+    if any(k in b_norm for k in [
+        "(எட்டுத்தொகை நூல்களில் ஒன்று)",
+        "(ஐம்பெருங்காப்பியங்களில் ஒன்று)",
+        "எட்டுத்தொகை நூல்களுள் ஒன்றான",
+        "(பதினெண்கீழ்க்கணக்கு நூல்களில் ஒன்று)",
+        "(பதினென் கீழ்க்கணக்கு நூல்)",
+        "(பதினெண்கீழ்க்கணக்கு நூல்)",
+        "(பதினெண் கீழ்க்கணக்கு நூல்)",
+        "(ஆசிரியர் - சீத்தலைச்சாத்தனார்)",
+    ]) and len(b_norm) < 120:
+        return True
+
+    if work_title and b_norm == work_title:
+        return True
+
+    return False
+
+
+def is_structural_heading(line: str) -> bool:
+    """
+    Conservatively identify genuine structural headings (canto, kathai, padalam, athikaram, etc.).
+    Prevents ordinary poetic text containing substrings such as 'இயல்பானான்', 'இயல்வது',
+    'மெல் இயல்', or 'பகுதியைக்' from being misidentified as headings.
+    """
+    line = line.strip()
+    if not line or len(line) > 60:
+        return False
+    if re.search(r'[,\.;\?!]$', line):
+        return False
+    if re.search(r'(?:^|\s)[\u0B80-\u0BFF\s]*காண்டம்$', line):
+        return True
+    if re.search(r'(?:^|\s)[\u0B80-\u0BFF\s]*காதை$', line):
+        return True
+    if re.search(r'(?:^|\s)[\u0B80-\u0BFF\s]*படலம்$', line):
+        return True
+    if re.search(r'(?:^|\s)[\u0B80-\u0BFF\s]*பதிகம்$', line):
+        return True
+    if re.search(r'(?:^|\s)அதிகாரம்(?:\s+\d+|\s*:.*)?$', line) or re.search(r'^\d+[\.\s]+[\u0B80-\u0BFF\s]+அதிகாரம்$', line):
+        return True
+    if re.search(r'(?:^|\s)[\u0B80-\u0BFF\s]*திருமுறை(?:\s*\(.*?\))?$', line):
+        return True
+    if re.match(r'^(?:\d+[\.\d\s]*\s+)?[\u0B80-\u0BFF]{3,15}(?:வியல்|இயல்)$', line):
+        if not re.search(r'(?:இயல்வது|இயல்பானான்|இயல்பு|இயல்பின்|இயல்பாக)$', line):
+            return True
+    if re.match(r'^(?:பகுதி|பாகம்)\s*[-:]?\s*\d+', line) or re.search(r'^(?:முதல்|இரண்டாம்|மூன்றாம்|நான்காம்)\s*(?:பகுதி|பாகம்)$', line):
+        return True
+    if line in ["கடவுள் வாழ்த்து", "நூல் முகம்", "தற்சிறப்புப் பாயிரம்", "பொதுப் பாயிரம்", "சிறப்புப் பாயிரம்"]:
+        return True
+    if line.endswith("வருக்கம்"):
+        return True
+    return False
+
+
 def parse_tirukkural(
     work_meta: Dict[str, Any],
     clean_text: str,
     file_rel_path: str
 ) -> List[Dict[str, Any]]:
     """
-    Parse Tirukkural couplets into 1,330 distinct canonical chunks.
-    Preserves couplet couplet numbers 1..1330.
+    Parse Tirukkural couplets into 1,330 distinct canonical chunks with zero couplet shift.
+    Excludes English/header boilerplate and preserves exact lines and chapter metadata.
     """
     work_id = work_meta["work_id"]
     work_title = work_meta["work"]
@@ -159,49 +267,57 @@ def parse_tirukkural(
     release_no = work_meta.get("release_no", "PM0001")
     source_url = work_meta.get("source_url")
 
-    lines = clean_text.splitlines()
-    all_lines: List[Tuple[str, Optional[str], Optional[str]]] = []
-    current_chap: Optional[str] = "கடவுள் வாழ்த்து"
-    current_sec: Optional[str] = "அறத்துப்பால்"
+    raw_lines = clean_text.splitlines()
+    lines = [re.sub(r'[ \t]+', ' ', l).strip() for l in raw_lines]
+    lines = [l for l in lines if l]
 
-    for raw_l in lines:
-        l = raw_l.strip()
-        if not l:
-            continue
-        # Track chapter
-        chap_m = re.search(r'\d+\.\d+\.\d+\s*([\u0B80-\u0BFF\s]+)', l)
-        if chap_m:
-            current_chap = chap_m.group(1).strip()
-            continue
-        # Track section / paal
-        sec_m = re.search(r'\d+\.\s*([\u0B80-\u0BFF\s]+பால்)', l)
-        if sec_m:
-            current_sec = sec_m.group(1).strip()
-            continue
+    try:
+        start_idx = next(i for i, l in enumerate(lines) if l.startswith("அகர முதல"))
+        end_idx = next(i for i in range(len(lines)-1, -1, -1) if re.search(r'\s+1330\s*$', lines[i]))
+    except StopIteration:
+        return []
 
-        # Skip isolated header titles
-        if l in ["அறத்துப்பால்", "பொருட்பால்", "காமத்துப்பால்", "திருக்குறள்"]:
-            continue
+    def is_tk_header(l: str) -> bool:
+        if re.match(r'^\d+[\d\.,\s]*\s+[\u0B80-\u0BFF]', l):
+            return True
+        if l.endswith('முற்றிற்று'):
+            return True
+        if l in ['அறத்துப்பால்', 'பொருட்பால்', 'காமத்துப்பால்', 'திருக்குறள்']:
+            return True
+        if l.endswith('இயல்') and len(l) < 20:
+            return True
+        return False
 
-        # Skip English and volunteer boilerplate
-        if "Project Madurai" in l or "Etext" in l or "Kalyanasundaram" in l:
-            continue
-
-        all_lines.append((l, current_chap, current_sec))
-
+    current_sec = "அறத்துப்பால்"
+    current_chap = "கடவுள் வாழ்த்து"
     chunks = []
     st_num = 1
-    idx = 0
-    total_lines = len(all_lines)
+    i = start_idx
 
-    while idx < total_lines and st_num <= 1330:
-        l1, chap1, sec1 = all_lines[idx]
-        if idx + 1 < total_lines:
-            l2, chap2, sec2 = all_lines[idx + 1]
-            idx += 2
+    while i <= end_idx and st_num <= 1330:
+        l = lines[i]
+        if is_tk_header(l):
+            sec_m = re.match(r'^\d+\.\s*([\u0B80-\u0BFF]+பால்)', l)
+            if sec_m:
+                current_sec = sec_m.group(1).strip()
+            elif l in ['அறத்துப்பால்', 'பொருட்பால்', 'காமத்துப்பால்']:
+                current_sec = l
+
+            chap_m = re.match(r'^\d+[\d\.,\s]*\s+([\u0B80-\u0BFF\s]+)', l)
+            if chap_m:
+                candidate = chap_m.group(1).strip()
+                if not candidate.endswith('பால்') and not candidate.endswith('இயல்'):
+                    current_chap = candidate
+            i += 1
+            continue
+
+        l1 = l
+        if i + 1 <= end_idx:
+            l2 = lines[i + 1]
+            i += 2
         else:
             l2 = ""
-            idx += 1
+            i += 1
 
         clean_l1 = re.sub(r'\s*\d{1,5}\s*$', '', l1).strip()
         clean_l2 = re.sub(r'\s*\d{1,5}\s*$', '', l2).strip()
@@ -220,8 +336,8 @@ def parse_tirukkural(
                 "author": author,
                 "period": period,
                 "genre": genre,
-                "canto": sec1,
-                "chapter": chap1,
+                "canto": current_sec,
+                "chapter": current_chap,
                 "stanza_number": st_num,
                 "verse_number": str(st_num),
                 "line_range": f"{st_num*2-1}-{st_num*2}",
@@ -242,7 +358,7 @@ def parse_generic_stanzas(
 ) -> List[Dict[str, Any]]:
     """
     Parse Sangam poetry, didactic venbas, epic cantos, and bhakti hymns into
-    canonical stanza/verse chunks.
+    canonical stanza/verse chunks, preserving whole literary units and aphorisms.
     """
     work_id = work_meta["work_id"]
     work_title = work_meta["work"]
@@ -263,24 +379,31 @@ def parse_generic_stanzas(
     for b in blocks:
         # Check Tamil character density
         tamil_chars = len(re.findall(r'[\u0B80-\u0BFF]', b))
-        if tamil_chars < 12:
+        if tamil_chars < 6:
             continue
 
-        # Skip PM copyright and volunteer acknowledgments
-        if "Project Madurai" in b and ("initiative" in b or "free" in b or "prepared" in b or "Etext" in b):
-            continue
-        if "இம்மின்னுரை" in b or "மின்னூலாக்கம்" in b or "உரிமை - பொதுக் களம்" in b:
+        # Skip PM copyright, volunteer acknowledgments, and navigation boilerplate
+        if is_boilerplate(b, work_title):
             continue
 
         lines = [l.strip() for l in b.splitlines() if l.strip()]
         if not lines:
             continue
 
-        # Check for canto or chapter title (short block with header keywords)
+        # Check for standalone canto/chapter/varukkam title
         if len(lines) == 1 and len(lines[0]) < 60:
             header_line = lines[0]
-            if any(k in header_line for k in ["காண்டம்", "காதை", "படலம்", "பதிகம்", "இயல்", "அதிகாரம்", "திருமுறை", "பகுதி"]):
-                current_canto = header_line
+            if is_structural_heading(header_line):
+                # Don't treat work title numbers (e.g. 1. ஆத்திசூடி) as canto
+                if not re.match(r'^\d+\.\s*(?:ஆத்திசூடி|கொன்றை வேந்தன்|மூதுரை|நல்வழி)$', header_line):
+                    current_canto = header_line
+                continue
+
+        # If line 0 is a varukkam header inside a multi-line block
+        if lines[0].endswith("வருக்கம்"):
+            current_canto = lines[0]
+            lines = lines[1:]
+            if not lines:
                 continue
 
         # Check for poet attribution line at end (e.g. "-தேவகுலத்தார்." or "-ஔவையார்.")
@@ -293,12 +416,14 @@ def parse_generic_stanzas(
 
         # Check if the block consists of multiple separately numbered aphorisms/verses
         numbered_lines = [l for l in lines if re.match(r'^\d+\.\s*[\u0B80-\u0BFF]', l)]
-        if len(numbered_lines) >= 2 and len(numbered_lines) == len(lines):
+        if len(numbered_lines) >= 2 or (len(lines) == 1 and re.match(r'^\d+\.\s*[\u0B80-\u0BFF]', lines[0])):
             for nl in lines:
                 m = re.match(r'^(\d+)\.\s*(.*)', nl)
                 if not m:
                     continue
                 v_num, v_text = m.group(1), m.group(2).strip()
+                if v_text in ["ஆத்திசூடி", "கொன்றை வேந்தன்", "மூதுரை", "நல்வழி"]:
+                    continue
                 v_norm = normalize_tamil_text(v_text)
                 if len(v_norm) < 4:
                     continue
@@ -325,25 +450,51 @@ def parse_generic_stanzas(
                 st_num += 1
             continue
 
-        # Check for verse numbering at start of stanza (e.g. "3. குறிஞ்சி - தலைவி கூற்று" or "4.")
+        # Check for multi-line stanza starting with a verse number (e.g. Naladiyar, Kuruntokai)
         verse_num = str(st_num)
         canto_info = current_canto
+
         if lines and re.match(r'^\d+\.', lines[0]):
             header_match = re.match(r'^(\d+)\.\s*(.*)', lines[0])
             if header_match:
-                verse_num = header_match.group(1)
+                v_num = header_match.group(1)
                 sub_label = header_match.group(2).strip()
-                if sub_label:
-                    canto_info = f"{current_canto} - {sub_label}" if current_canto else sub_label
-            lines = lines[1:]
+
+                if sub_label in ["ஆத்திசூடி", "கொன்றை வேந்தன்", "மூதுரை", "நல்வழி", "அறத்துப்பால்", "பொருட்பால்", "காமத்துப்பால்"]:
+                    continue
+
+                is_pure_header = False
+                if not sub_label:
+                    is_pure_header = True
+                elif sub_label in ['கடவுள் வாழ்த்து', 'நூல்', 'பாயிரம்', 'சிறப்புப் பாயிரம்', 'பொதுப் பாயிரம்', 'குறிஞ்சி', 'முல்லை', 'மருதம்', 'நெய்தல்', 'பாலை']:
+                    is_pure_header = True
+                elif ('கூற்று' in sub_label or 'திணை' in sub_label or 'துறை' in sub_label or 'பாடியவர்' in sub_label) and len(sub_label) <= 30 and not re.search(r'[,;\?!]', sub_label):
+                    is_pure_header = True
+                elif len(lines) >= 4 and len(sub_label) <= 20 and not re.search(r'[,;\?!]', sub_label) and ' ' not in sub_label:
+                    is_pure_header = True
+
+                if is_pure_header:
+                    verse_num = v_num
+                    if sub_label in ['குறிஞ்சி', 'முல்லை', 'மருதம்', 'நெய்தல்', 'பாலை'] and not current_canto:
+                        canto_info = sub_label
+                    lines = lines[1:]
+                else:
+                    verse_num = v_num
+                    lines[0] = sub_label
 
         if not lines:
             continue
 
+        # Check for trailing verse number on last line (e.g. "... 40" in Iniyavai, Nanmanikkadikai)
+        last_m = re.search(r'\s+(\d{1,4})\s*$', lines[-1])
+        if last_m and verse_num == str(st_num):
+            verse_num = last_m.group(1)
+            lines[-1] = re.sub(r'\s*\d{1,4}\s*$', '', lines[-1]).strip()
+
         orig_text = '\n'.join(lines)
         norm_text = normalize_tamil_text(' '.join(lines))
 
-        if len(norm_text) < 10:
+        if len(norm_text) < 4:
             continue
 
         chunk_id = f"PM-{work_id}-{st_num:04d}"
