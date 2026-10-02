@@ -16,9 +16,9 @@ from backend.retrieval.aggregator import EvidenceAggregator
 
 logger = logging.getLogger(__name__)
 
-# Step 3E: Integration candidate pool size for Pass 3 semantic retrieval.
-# Note: Final production K calibration and thresholding will be established in Step 3F.
+# Step 3F: Empirically calibrated semantic candidate pool and similarity threshold.
 SEMANTIC_CANDIDATE_K = 25
+SEMANTIC_SIMILARITY_THRESHOLD = 0.845
 
 
 class RetrievalEngine:
@@ -42,6 +42,7 @@ class RetrievalEngine:
         project_madurai_semantic: Optional[ProjectMaduraiSemanticAdapter] = None,
         enable_semantic: bool = True,
         semantic_candidate_k: int = SEMANTIC_CANDIDATE_K,
+        semantic_similarity_threshold: float = SEMANTIC_SIMILARITY_THRESHOLD,
     ):
         """
         Initialize the Retrieval Engine with resource adapters.
@@ -54,6 +55,7 @@ class RetrievalEngine:
         self.project_madurai = project_madurai or ProjectMaduraiExactAdapter()
         self.enable_semantic = enable_semantic
         self.semantic_candidate_k = semantic_candidate_k
+        self.semantic_similarity_threshold = semantic_similarity_threshold
 
         # Lazy load Wiktionary so it doesn't fail if the db is still building
         try:
@@ -210,6 +212,7 @@ class RetrievalEngine:
                     query=target,
                     lemma=semantic_lemma,
                     top_k=self.semantic_candidate_k,
+                    threshold=self.semantic_similarity_threshold,
                 )
 
                 # Defensive check: if adapter returned an ERROR evidence item,
@@ -224,8 +227,12 @@ class RetrievalEngine:
                     )
                     semantic_evs = []
 
-                # Filter strictly for FOUND evidence
-                found_semantic = [e for e in semantic_evs if e.metadata.get("status") == "FOUND"]
+                # Filter strictly for FOUND evidence passing calibrated similarity threshold
+                found_semantic = [
+                    e for e in semantic_evs
+                    if e.metadata.get("status") == "FOUND"
+                    and e.metadata.get("similarity_score", 0.0) >= self.semantic_similarity_threshold
+                ]
 
                 for sem_ev in found_semantic:
                     cid = sem_ev.source_id or sem_ev.metadata.get("chunk_id")

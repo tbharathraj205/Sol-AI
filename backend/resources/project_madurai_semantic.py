@@ -43,6 +43,10 @@ PINNED_EMBEDDING_DIM = 384
 MAX_SEQUENCE_LENGTH = 512
 QUERY_PREFIX = "query: "
 
+# Step 3F Calibrated Production Operating Point
+CALIBRATED_CANDIDATE_K = 25
+CALIBRATED_SIMILARITY_THRESHOLD = 0.845
+
 # Process-local model cache: (model_id, revision, device_str) -> (tokenizer, model)
 _MODEL_CACHE: Dict[Tuple[str, str, str], Tuple[AutoTokenizer, AutoModel]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -456,6 +460,7 @@ class ProjectMaduraiSemanticAdapter(ResourceAdapter):
         query: str,
         lemma: Optional[str] = None,
         top_k: int = 10,
+        threshold: Optional[float] = None,
     ) -> List[Evidence]:
         """
         Perform dense semantic lookup in the Project Madurai corpus.
@@ -464,6 +469,7 @@ class ProjectMaduraiSemanticAdapter(ResourceAdapter):
         :param lemma: Optional candidate lemma provided by caller/pipeline.
                       NEVER fabricated by the adapter itself.
         :param top_k: Number of top semantic candidates to return (default: 10).
+        :param threshold: Optional minimum similarity threshold to filter candidates.
         :return: List of Evidence objects representing matching literary passages.
         """
         clean_query = query.strip() if query else ""
@@ -486,6 +492,9 @@ class ProjectMaduraiSemanticAdapter(ResourceAdapter):
             order = np.lexsort((self._chunk_ids, -scores))
             k = min(top_k, len(order))
             top_indices = order[:k]
+
+            if threshold is not None:
+                top_indices = np.array([idx for idx in top_indices if float(scores[idx]) >= threshold], dtype=int)
 
             return self._build_evidence_list(clean_query, lemma, top_indices, scores)
 
