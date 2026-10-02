@@ -16,6 +16,15 @@ CRITICAL INSTRUCTIONS & GROUNDING RULES:
    - CORE FST ANALYSIS > LEXICAL MAPPING > GUESSER ANALYSIS.
    - Core analyses take precedence over guesser analyses, but guesser evidence must still be disclosed in uncertainties if present.
 7. Distinguish DIRECTLY SUPPORTED facts from CONTEXTUAL INTERPRETATION and UNCERTAINTIES.
+8. CONTEXT-AWARE POLYSEMY & WORD-SENSE DISAMBIGUATION (WSD):
+   - The user's highlighted word may be polysemous (பலபொருள் ஒரு சொல்).
+   - The supplied "Query Context (User Sentence)" is the primary evidence for determining which lexical sense of the queried word is intended.
+   - Do NOT simply return the most common or dominant dictionary meaning for "contextual_meaning".
+   - Compare the candidate meanings/senses in the EvidencePack against the actual user sentence.
+   - For "contextual_meaning": Select and return ONLY the specific documented lexical sense that best fits the user's context sentence. MUST BE WRITTEN IN TAMIL (தமிழ்).
+   - "meaning" MUST still contain the general documented definitions/senses (separated by semicolons). Do NOT collapse general meaning and contextual meaning into the same field.
+   - If no Query Context is provided, "contextual_meaning" MUST be null.
+   - If the Query Context does not provide sufficient clues to distinguish senses or is ambiguous, do NOT invent certainty. State the ambiguity in "uncertainties" and keep "contextual_meaning" null or explain the ambiguity in "contextual_interpretation".
 
 You MUST return valid JSON matching the following SOLResponse JSON schema:
 {
@@ -23,7 +32,7 @@ You MUST return valid JSON matching the following SOLResponse JSON schema:
   "normalized_query": "normalized query string",
   "lemma": "primary root lemma or null if unknown",
   "meaning": "primary definition(s) or null if unsupported. MUST BE WRITTEN IN TAMIL (தமிழ்).",
-  "contextual_meaning": "If the user provided a Query Context sentence, deduce the specific meaning of the word in that context based on your evidence. If no query context, leave null. MUST BE WRITTEN IN TAMIL (தமிழ்).",
+  "contextual_meaning": "If the user provided a Query Context sentence, the specific documented lexical sense that best fits the word in that sentence. If no Query Context or if ambiguous, null. MUST BE WRITTEN IN TAMIL (தமிழ்).",
   "contextual_interpretation": "grounded summary explanation without fabrication. MUST BE WRITTEN IN TAMIL (தமிழ்).",
   "sources": ["ThamizhiMorph", "Sentamizh"],
   "uncertainties": ["explicit notes on missing data, conflicts, or guesser analyses"],
@@ -42,6 +51,7 @@ def format_evidence_prompt(pack: EvidencePack) -> str:
     lines.append(f"Normalized Query: {pack.normalized_query}")
     if pack.query_context:
         lines.append(f"Query Context (User Sentence): {pack.query_context}")
+        lines.append("Context-Aware Disambiguation Notice: The user highlighted this word within the above sentence. Use this sentence as the primary anchor to disambiguate polysemous senses from the lexical evidence.")
     lines.append(f"Lemma Candidates: {', '.join(pack.lemma_candidates) if pack.lemma_candidates else 'None'}")
     lines.append("")
 

@@ -40,6 +40,15 @@ class MockLLMInterpreter(BaseLLMInterpreter):
     from EvidencePack without external API calls. Used for unit testing and offline execution.
     """
 
+    def __init__(self, wsd: Optional[Any] = None):
+        self._wsd = wsd
+
+    def _get_wsd(self):
+        if self._wsd is None:
+            from backend.interpretation.wsd import TamilWSD
+            self._wsd = TamilWSD()
+        return self._wsd
+
     def interpret(self, pack: EvidencePack) -> SOLResponse:
         query = pack.query
         norm_query = pack.normalized_query
@@ -71,8 +80,6 @@ class MockLLMInterpreter(BaseLLMInterpreter):
                     # Max length truncation per meaning
                     text_to_translate = m[:400]
                     res = translator.translate(text_to_translate)
-                    # Clean up random languages by forcing ASCII/English only?
-                    # The model might output random text if confused, but individual sentences work better.
                     eng_meanings.append(res)
                 english_meaning_str = "; ".join(eng_meanings)
             except Exception as e:
@@ -130,7 +137,6 @@ class MockLLMInterpreter(BaseLLMInterpreter):
             parts = re.split(r'[,;]\s*', meaning_str)
             for p in parts:
                 p = p.strip(' .')
-                # Check if it contains only Tamil characters and spaces
                 is_tamil = bool(re.match(r'^[\u0B80-\u0BFF\s]+$', p))
                 if p and is_tamil and len(p.split()) <= 2 and len(p) > 2 and p != query:
                     if not any(char in p for char in ['(', ')', '[', ']', '"', "'"]):
@@ -159,10 +165,24 @@ class MockLLMInterpreter(BaseLLMInterpreter):
         for conf in pack.conflicts:
             uncertainties.append(f"Conflict: {conf.get('description')}")
 
-        # Contextual interpretation synthesis
+        # Contextual interpretation synthesis via deterministic Tamil WSD
         contextual_meaning_mock = None
-        if pack.query_context:
-            contextual_meaning_mock = f"[MOCK] In the context of '{pack.query_context}', this word likely means: {meaning_str or 'specific meaning'}"
+        if pack.query_context and pack.query_context.strip():
+            candidate_senses = [ev.meaning for ev in pack.lexical_evidence if ev.meaning]
+            if candidate_senses:
+                wsd = self._get_wsd()
+                selected_sense, conf_score, wsd_reasons = wsd.disambiguate(
+                    query=query,
+                    context_sentence=pack.query_context,
+                    candidate_senses=candidate_senses,
+                )
+                if selected_sense:
+                    contextual_meaning_mock = selected_sense
+                else:
+                    contextual_meaning_mock = None
+                    uncertainties.append(
+                        f"Contextual sense ambiguity: The provided context does not establish sufficient discriminative evidence to select a unique lexical sense."
+                    )
 
         if pack.evidence_counts.get("total_found", 0) == 0:
             interpretation = (
@@ -175,7 +195,11 @@ class MockLLMInterpreter(BaseLLMInterpreter):
                 parts.append(f"The query '{query}' resolves to root/lemma '{lemma}'.")
             if morph_dict and morph_dict.get("pos"):
                 parts.append(f"Morphology indicates part-of-speech '{morph_dict['pos']}'.")
-            if meaning_str:
+            if contextual_meaning_mock:
+                parts.append(
+                    f"In the user's context ('{pack.query_context}'), the word reflects the specific sense: '{contextual_meaning_mock}'."
+                )
+            elif meaning_str:
                 parts.append(f"Lexical resources define the term as: {meaning_str}.")
             if lit_items:
                 works = list(set([item.work for item in lit_items if item.work]))
