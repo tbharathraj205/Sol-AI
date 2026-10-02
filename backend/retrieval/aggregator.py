@@ -61,6 +61,10 @@ class EvidenceAggregator:
                 if not source:
                     continue
 
+                # Semantic retrieval provides thematic literary context, not lexical verification
+                if ev.metadata.get("retrieval_mode") == "semantic":
+                    continue
+
                 # Check if this evidence object matches target_str
                 matches_surface = (ev.surface == target_str)
                 matches_lemma = (ev.lemma == target_str)

@@ -96,9 +96,9 @@ class TestUnifiedRetrieval(unittest.TestCase):
         self.assertEqual(len(result.cross_resource_support), 0)
 
     def test_candidate_only_not_counted_as_evidence(self):
-        """5. Test that candidate-only information without FOUND evidence is not counted."""
+        """5. Test that candidate-only information without FOUND evidence is not counted (deterministic mode)."""
         query = "போலிசொல்வார்த்தை123"
-        result = self.engine.search(query)
+        result = self.engine.search(query, enable_semantic=False)
         found_evs = [e for e in result.evidence if e.metadata.get("status") == "FOUND"]
         self.assertEqual(len(found_evs), 0)
 

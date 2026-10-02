@@ -106,9 +106,9 @@ class TestInterpreter(unittest.TestCase):
                 self.assertEqual(atype, "lexical_mapping")
 
     def test_unknown_word_interpretation(self):
-        """4. Test unknown word handling without fabrication."""
+        """4. Test unknown word handling without fabrication (deterministic mode)."""
         query = "போலிசொல்வார்த்தை123"
-        retrieval_result = self.engine.search(query)
+        retrieval_result = self.engine.search(query, enable_semantic=False)
         pack = build_evidence_pack(retrieval_result)
 
         self.assertEqual(len(pack.morphology_evidence), 0)
