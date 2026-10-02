@@ -1,13 +1,13 @@
 /**
  * Global Configuration & Storage Helper for SOL AI Browser Extension.
- * Default API Base URL: http://localhost:8000
+ * Default API Base URL: http://127.0.0.1:8000
  * The browser extension NEVER handles Gemini API keys directly; keys remain server-side.
  */
 
 const DEFAULT_CONFIG = {
-  SOL_API_BASE_URL: "http://localhost:8000",
+  SOL_API_BASE_URL: "http://127.0.0.1:8000",
   DEFAULT_PROVIDER: "mock",
-  TIMEOUT_MS: 45000,
+  TIMEOUT_MS: 24000,
 };
 
 /**

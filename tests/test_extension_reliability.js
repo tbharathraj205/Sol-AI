@@ -1,0 +1,264 @@
+/**
+ * Automated Extension Reliability Test Suite (Part H).
+ *
+ * Verifies:
+ * Test A: Normal result: loading -> result, watchdog cleared.
+ * Test B: Backend error: loading -> error, no infinite spinner, watchdog cleared.
+ * Test C: Timeout: loading -> watchdog triggers at 25s -> timeout error -> retry button available.
+ * Test D: New query while old query is loading: old watchdog must not overwrite the new query's UI.
+ */
+
+const path = require("path");
+const assert = require("assert");
+
+// Setup minimal mock DOM
+function createMockElement(tag) {
+  const el = {
+    tagName: tag.toUpperCase(),
+    children: [],
+    style: {},
+    className: "",
+    textContent: "",
+    innerHTML: "",
+    parent: null,
+    classList: {
+      add: (c) => { el.className = (el.className ? el.className + " " : "") + c; },
+      remove: (c) => { el.className = (el.className || "").replace(c, "").trim(); },
+      contains: (c) => (el.className || "").split(/\s+/).includes(c),
+    },
+    setAttribute: (k, v) => { el[k] = v; },
+    appendChild: (c) => {
+      c.parent = el;
+      el.children.push(c);
+      return c;
+    },
+    remove: () => {
+      if (el.parent) {
+        el.parent.children = el.parent.children.filter((c) => c !== el);
+      }
+    },
+    querySelector: (sel) => {
+      for (const child of el.children) {
+        if (sel.startsWith("#") && child.id === sel.slice(1)) return child;
+        if (sel.startsWith(".") && child.classList.contains(sel.slice(1))) return child;
+        if (child.querySelector) {
+          const found = child.querySelector(sel);
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+    querySelectorAll: (sel) => [],
+    attachShadow: () => {
+      const shadow = createMockElement("shadow-root");
+      shadow.parent = el;
+      el.shadowRoot = shadow;
+      return shadow;
+    },
+  };
+  return el;
+}
+
+global.document = {
+  createElement: createMockElement,
+  body: createMockElement("body"),
+};
+
+let messageListeners = [];
+global.chrome = {
+  runtime: {
+    getURL: (p) => p,
+    sendMessage: (msg, cb) => {},
+    onMessage: {
+      addListener: (fn) => { messageListeners.push(fn); },
+    },
+  },
+};
+
+// Require content script
+const content = require("../extension/content/content.js");
+
+function dispatchMessage(msg) {
+  for (const listener of messageListeners) {
+    listener(msg, {}, () => {});
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Test A: Normal result -> loading -> result -> watchdog cleared
+// -----------------------------------------------------------------------------
+function testA_normalResult() {
+  console.log("Running Test A: Normal result...");
+  dispatchMessage({ action: "SHOW_LOADING", query: "கால்" });
+  assert.strictEqual(content.getActiveWatchdogQuery(), "கால்", "Watchdog query must be set to 'கால்'");
+  assert.ok(content.getWatchdog() !== null, "Watchdog timer must be active");
+
+  const mockResult = {
+    lemma: "கால்",
+    meaning: "விலங்குகளின் உறுப்பு",
+    morphology: { pos: "noun", analysis_type: "core" },
+    literary_context: [{ work: "குறுந்தொகை", passage: "கால் பொழி..." }],
+  };
+
+  dispatchMessage({ action: "SHOW_RESULT", query: "கால்", result: mockResult });
+  assert.strictEqual(content.getWatchdog(), null, "Watchdog must be cleared on SHOW_RESULT");
+  assert.strictEqual(content.getActiveWatchdogQuery(), "", "Active watchdog query must be reset");
+
+  const shadow = content.getShadowRoot();
+  const wordTitle = shadow.querySelector(".sol-word-title");
+  assert.ok(wordTitle, "Result panel must render word title");
+  assert.strictEqual(wordTitle.textContent, "கால்");
+  console.log("  [PASS] Test A: Loading -> Result transition cleared watchdog cleanly.");
+}
+
+// -----------------------------------------------------------------------------
+// Test B: Backend error -> loading -> error -> no infinite spinner
+// -----------------------------------------------------------------------------
+function testB_backendError() {
+  console.log("Running Test B: Backend error...");
+  dispatchMessage({ action: "SHOW_LOADING", query: "மரங்களில்" });
+  assert.ok(content.getWatchdog() !== null, "Watchdog timer must be active");
+
+  dispatchMessage({ action: "SHOW_ERROR", query: "மரங்களில்", error: "Backend server offline", canRetry: true });
+  assert.strictEqual(content.getWatchdog(), null, "Watchdog must be cleared on SHOW_ERROR");
+
+  const shadow = content.getShadowRoot();
+  const title = shadow.querySelector(".sol-status-title");
+  assert.ok(title, "Error panel must render status title");
+  const retryBtn = shadow.querySelector(".sol-status-btn");
+  assert.ok(retryBtn, "Error panel must provide retry button");
+  console.log("  [PASS] Test B: Error received, watchdog cleared, retry button available.");
+}
+
+// -----------------------------------------------------------------------------
+// Test C: Timeout -> loading -> watchdog triggers at 25s -> retry available
+// -----------------------------------------------------------------------------
+async function testC_watchdogTimeout() {
+  console.log("Running Test C: Watchdog timeout fallback...");
+
+  const realSetTimeout = global.setTimeout;
+  let timerFn = null;
+  global.setTimeout = (fn, delay) => {
+    timerFn = fn;
+    return 999;
+  };
+
+  try {
+    dispatchMessage({ action: "SHOW_LOADING", query: "நீண்டதேடல்" });
+    assert.ok(timerFn !== null, "Watchdog timer function was registered");
+
+    // Simulate 25-second timeout firing
+    timerFn();
+
+    // Verify error panel rendered
+    const shadow = content.getShadowRoot();
+    const desc = shadow.querySelector(".sol-status-desc");
+    assert.ok(desc, "Status desc must exist on timeout");
+    assert.ok(
+      desc.textContent.includes("SOL AI took too long to respond"),
+      `Unexpected desc textContent: '${desc.textContent}'`
+    );
+    assert.strictEqual(content.getWatchdog(), null, "Watchdog must be null after firing");
+    const retryBtn = shadow.querySelector(".sol-status-btn");
+    assert.ok(retryBtn, "Retry button must be available after timeout");
+    console.log("  [PASS] Test C: Watchdog timed out and recovered gracefully with retry button.");
+  } finally {
+    global.setTimeout = realSetTimeout;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Test D: New query while old query is loading: old timer cannot overwrite new UI
+// -----------------------------------------------------------------------------
+function testD_newQueryCancelsOldWatchdog() {
+  console.log("Running Test D: New query cancels old watchdog...");
+
+  const realSetTimeout = global.setTimeout;
+  const realClearTimeout = global.clearTimeout;
+  let registeredTimers = [];
+  let clearedTimers = [];
+
+  global.setTimeout = (fn, delay) => {
+    const id = registeredTimers.length + 1;
+    registeredTimers.push({ id, fn, delay });
+    return id;
+  };
+  global.clearTimeout = (id) => {
+    clearedTimers.push(id);
+  };
+
+  try {
+    // 1. First query started
+    dispatchMessage({ action: "SHOW_LOADING", query: "சொல்1" });
+    const timer1 = registeredTimers[0];
+    assert.strictEqual(content.getActiveWatchdogQuery(), "சொல்1");
+
+    // 2. Second query arrives before timer1 fires
+    dispatchMessage({ action: "SHOW_LOADING", query: "சொல்2" });
+    assert.strictEqual(content.getActiveWatchdogQuery(), "சொல்2");
+    assert.ok(clearedTimers.includes(timer1.id), "Timer 1 must be explicitly cleared by clearTimeout");
+
+    // 3. If timer1 somehow fired late, verify it does NOT overwrite சொல்2
+    timer1.fn();
+    assert.strictEqual(content.getActiveWatchdogQuery(), "சொல்2", "Stale timer must NOT clear or overwrite active query 2");
+
+    console.log("  [PASS] Test D: Old query watchdog cleanly superseded by new query.");
+  } finally {
+    global.setTimeout = realSetTimeout;
+    global.clearTimeout = realClearTimeout;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Test E: Multiple meanings displayed as bullet points instead of semicolon
+// -----------------------------------------------------------------------------
+function testE_multipleMeaningsBullets() {
+  console.log("Running Test E: Multiple meanings bullet points rendering...");
+  const mockResult = {
+    lemma: "கால்",
+    meaning: "மாந்தர்கள் உட்பட விலங்குகளின் ஓர் உடல் உறுப்பு; இது தரையில் ஊன்றி நடக்கவோ, நகரவோ பயன்படுவது.",
+    morphology: { pos: "noun", analysis_type: "core" },
+    literary_context: [],
+  };
+
+  dispatchMessage({ action: "SHOW_RESULT", query: "கால்", result: mockResult });
+  const shadow = content.getShadowRoot();
+  const bulletsList = shadow.querySelector(".sol-meaning-bullets");
+  assert.ok(bulletsList, "Must render .sol-meaning-bullets list when multiple senses exist");
+  assert.strictEqual(bulletsList.children.length, 2, "Must contain exactly 2 bullet items");
+  assert.strictEqual(bulletsList.children[0].tagName, "LI", "First item must be an LI");
+  assert.strictEqual(bulletsList.children[0].textContent, "மாந்தர்கள் உட்பட விலங்குகளின் ஓர் உடல் உறுப்பு");
+  assert.strictEqual(bulletsList.children[1].tagName, "LI", "Second item must be an LI");
+  assert.strictEqual(bulletsList.children[1].textContent, "இது தரையில் ஊன்றி நடக்கவோ, நகரவோ பயன்படுவது.");
+
+  // Also test single meaning fallback
+  const singleResult = {
+    lemma: "மரம்",
+    meaning: "தாவர வகை",
+    morphology: { pos: "noun", analysis_type: "core" },
+    literary_context: [],
+  };
+  dispatchMessage({ action: "SHOW_RESULT", query: "மரம்", result: singleResult });
+  const singleShadow = content.getShadowRoot();
+  const singleBullets = singleShadow.querySelector(".sol-meaning-bullets");
+  assert.strictEqual(singleBullets, null, "Must not render bullet list for single meaning");
+  const summary = singleShadow.querySelector(".sol-meaning-summary");
+  assert.ok(summary, "Must render .sol-meaning-summary for single meaning");
+  assert.strictEqual(summary.textContent, "தாவர வகை");
+
+  console.log("  [PASS] Test E: Multiple meanings rendered cleanly as bullet items.");
+}
+
+async function runAll() {
+  testA_normalResult();
+  testB_backendError();
+  await testC_watchdogTimeout();
+  testD_newQueryCancelsOldWatchdog();
+  testE_multipleMeaningsBullets();
+  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (5/5)!");
+}
+
+runAll().catch((err) => {
+  console.error("Test failure:", err);
+  process.exit(1);
+});

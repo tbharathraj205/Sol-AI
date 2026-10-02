@@ -109,19 +109,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     lemmaTitle.className = "sol-lemma-title";
     lemmaTitle.textContent = data.lemma || data.query;
 
-    const meaningText = document.createElement("div");
-    meaningText.className = "sol-meaning-text";
-    if (data.meaning) {
-      const senses = data.meaning.split(';').map(s => s.trim()).filter(Boolean);
-      meaningText.textContent = senses.slice(0, 2).join('; ');
-    } else {
-      meaningText.className += " sol-empty-meaning";
-      meaningText.textContent = "Meaning not established from the available evidence.";
-    }
-
     lemmaCard.appendChild(lemmaHeader);
     lemmaCard.appendChild(lemmaTitle);
-    lemmaCard.appendChild(meaningText);
+
+    const senses = data.meaning
+      ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+      : [];
+
+    if (senses.length > 1) {
+      const meanList = document.createElement("ul");
+      meanList.className = "sol-meaning-bullets";
+      senses.forEach(sense => {
+        const li = document.createElement("li");
+        li.textContent = sense;
+        meanList.appendChild(li);
+      });
+      lemmaCard.appendChild(meanList);
+    } else if (senses.length === 1) {
+      const meaningText = document.createElement("div");
+      meaningText.className = "sol-meaning-text";
+      meaningText.textContent = senses[0];
+      lemmaCard.appendChild(meaningText);
+    } else {
+      const meaningText = document.createElement("div");
+      meaningText.className = "sol-meaning-text sol-empty-meaning";
+      meaningText.textContent = "Meaning not established from the available evidence.";
+      lemmaCard.appendChild(meaningText);
+    }
+
     popupView.appendChild(lemmaCard);
 
     // 2. Morphology Card

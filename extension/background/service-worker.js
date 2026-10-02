@@ -54,22 +54,51 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     // 2. Perform API request to SOL AI backend
     const apiBaseUrl = await getApiBaseUrl();
-    const response = await fetchWithTimeout(
-      `${apiBaseUrl}/api/query`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: queryText, context: contextText }),
-      },
-      DEFAULT_CONFIG.TIMEOUT_MS
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
+    let response;
+    try {
+      response = await fetchWithTimeout(
+        `${apiBaseUrl}/api/query`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: queryText, context: contextText }),
+        },
+        DEFAULT_CONFIG.TIMEOUT_MS
+      );
+    } catch (fetchErr) {
+      let errorMsg = `SOL AI server could not be reached at ${apiBaseUrl}. Ensure the backend server is running.`;
+      if (fetchErr.name === "AbortError") {
+        errorMsg = "SOL AI took too long to respond (request timed out).";
+      }
       chrome.tabs.sendMessage(tab.id, {
         action: "SHOW_ERROR",
-        error: data.error || `SOL AI API returned HTTP status ${response.status}.`,
+        error: errorMsg,
+        query: queryText,
+        canRetry: true,
+      });
+      return;
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonErr) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: "SHOW_ERROR",
+        error: "Received invalid response format from SOL AI server.",
+        query: queryText,
+        canRetry: true,
+      });
+      return;
+    }
+
+    if (!response.ok) {
+      const errDetail = (data && typeof data === "object" && data.error)
+        ? data.error
+        : `SOL AI API returned HTTP status ${response.status}.`;
+      chrome.tabs.sendMessage(tab.id, {
+        action: "SHOW_ERROR",
+        error: errDetail,
         query: queryText,
         canRetry: true,
       });
@@ -83,9 +112,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       result: data,
     });
   } catch (err) {
-    let errorMsg = "SOL AI could not be reached.";
-    if (err.name === "AbortError") {
-      errorMsg = "SOL AI took too long to respond.";
+    let errorMsg = "An unexpected error occurred while communicating with SOL AI.";
+    if (err && err.name === "AbortError") {
+      errorMsg = "SOL AI took too long to respond (request timed out).";
     }
 
     chrome.tabs.sendMessage(tab.id, {
@@ -109,36 +138,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
       try {
         const apiBaseUrl = await getApiBaseUrl();
-        const response = await fetchWithTimeout(
-          `${apiBaseUrl}/api/query`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              query: queryText, 
-              context: message.context || "", 
-              provider: message.provider 
-            }),
-          },
-          DEFAULT_CONFIG.TIMEOUT_MS
-        );
+        let response;
+        try {
+          response = await fetchWithTimeout(
+            `${apiBaseUrl}/api/query`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                query: queryText, 
+                context: message.context || "", 
+                provider: message.provider 
+              }),
+            },
+            DEFAULT_CONFIG.TIMEOUT_MS
+          );
+        } catch (fetchErr) {
+          let errorMsg = `SOL AI server could not be reached at ${apiBaseUrl}. Ensure the backend server is running.`;
+          if (fetchErr.name === "AbortError") {
+            errorMsg = "SOL AI took too long to respond (request timed out).";
+          }
+          sendResponse({ status: "error", error: errorMsg });
+          return;
+        }
 
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (jsonErr) {
+          sendResponse({ status: "error", error: "Received invalid response format from SOL AI server." });
+          return;
+        }
 
         if (!response.ok) {
-          sendResponse({
-            status: "error",
-            error: data.error || `API returned status ${response.status}`,
-          });
+          const errDetail = (data && typeof data === "object" && data.error)
+            ? data.error
+            : `API returned status ${response.status}`;
+          sendResponse({ status: "error", error: errDetail });
         } else {
           sendResponse({ status: "success", data: data });
         }
       } catch (err) {
-        let errorMsg = "SOL AI could not be reached.";
-        if (err.name === "AbortError") {
-          errorMsg = "SOL AI took too long to respond.";
-        }
-        sendResponse({ status: "error", error: errorMsg });
+        sendResponse({ status: "error", error: "An unexpected error occurred while communicating with SOL AI." });
       }
     })();
 
@@ -154,7 +195,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 /**
  * Fetch wrapper with timeout abort controller
  */
-async function fetchWithTimeout(resource, options = {}, timeoutMs = 15000) {
+async function fetchWithTimeout(resource, options = {}, timeoutMs = 24000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {

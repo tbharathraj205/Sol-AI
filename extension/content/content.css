@@ -310,6 +310,29 @@
   font-size: 14px;
   color: var(--sol-text-main);
   margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.sol-meaning-bullets {
+  list-style-type: disc;
+  margin: 0 0 16px 0;
+  padding-left: 20px;
+}
+
+.sol-meaning-bullets li {
+  display: list-item;
+  font-size: 14px;
+  color: var(--sol-text-main);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.sol-meaning-bullets li:last-child {
+  margin-bottom: 0;
+}
+
+.sol-meaning-bullets li::marker {
+  color: var(--sol-gold);
 }
 
 .sol-meaning-list {

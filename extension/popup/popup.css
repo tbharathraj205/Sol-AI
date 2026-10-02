@@ -325,6 +325,39 @@ body {
   font-size: 14px;
   margin-bottom: 12px;
 }
+.sol-lemma-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sol-text-main);
+  margin-bottom: 8px;
+}
+.sol-meaning-text {
+  font-size: 13px;
+  color: var(--sol-text-main);
+  line-height: 1.5;
+}
+.sol-empty-meaning {
+  color: var(--sol-text-muted);
+  font-style: italic;
+}
+.sol-meaning-bullets {
+  list-style-type: disc;
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+}
+.sol-meaning-bullets li {
+  display: list-item;
+  font-size: 13px;
+  color: var(--sol-text-main);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.sol-meaning-bullets li:last-child {
+  margin-bottom: 0;
+}
+.sol-meaning-bullets li::marker {
+  color: var(--sol-gold);
+}
 .sol-source-tags {
   display: flex;
   flex-wrap: wrap;

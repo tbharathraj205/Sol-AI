@@ -26,6 +26,16 @@ const ICONS = {
 let solHostContainer = null;
 let solShadowRoot = null;
 let solLastQuery = "";
+let loadingWatchdog = null;
+let activeWatchdogQuery = "";
+
+function clearWatchdog() {
+  if (loadingWatchdog) {
+    clearTimeout(loadingWatchdog);
+    loadingWatchdog = null;
+  }
+  activeWatchdogQuery = "";
+}
 
 function getShadowRoot() {
   if (!solHostContainer) {
@@ -116,6 +126,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 function closePanel() {
+  clearWatchdog();
   if (solShadowRoot) {
     const panel = solShadowRoot.querySelector("#sol-ai-panel");
     if (panel) panel.remove();
@@ -201,6 +212,7 @@ function createBasePanel() {
 
 function renderDefaultPanel() {
   const { body } = createBasePanel();
+  clearWatchdog();
   
   const state = document.createElement("div");
   state.className = "sol-default-state";
@@ -231,7 +243,9 @@ function renderDefaultPanel() {
 
 function renderLoadingPanel(queryText) {
   const { body } = createBasePanel();
-  
+  clearWatchdog();
+  activeWatchdogQuery = queryText;
+
   const state = document.createElement("div");
   state.className = "sol-status-state";
   
@@ -252,10 +266,24 @@ function renderLoadingPanel(queryText) {
   state.appendChild(desc);
   
   body.appendChild(state);
+
+  // Watchdog: recover gracefully if background worker is killed or stalled (>25s)
+  loadingWatchdog = setTimeout(() => {
+    if (activeWatchdogQuery === queryText) {
+      loadingWatchdog = null;
+      activeWatchdogQuery = "";
+      renderErrorPanel(
+        queryText,
+        "SOL AI took too long to respond. The server may still be warming up.",
+        true
+      );
+    }
+  }, 25000);
 }
 
 function renderErrorPanel(queryText, errorMessage, canRetry) {
   const { body } = createBasePanel();
+  clearWatchdog();
   
   const state = document.createElement("div");
   state.className = "sol-status-state";
@@ -301,6 +329,7 @@ function renderErrorPanel(queryText, errorMessage, canRetry) {
 
 function renderResultPanel(queryText, data) {
   const { body } = createBasePanel();
+  clearWatchdog();
   
   // 1. Hero Section
   const hero = document.createElement("div");
@@ -399,15 +428,25 @@ function renderResultPanel(queryText, data) {
   meanHeader.innerHTML = `${ICONS.book} General Meaning`;
   meanCard.appendChild(meanHeader);
   
-  const meanText = document.createElement("div");
-  meanText.className = "sol-meaning-summary";
-  let truncatedMeaning = data.meaning;
-  if (truncatedMeaning) {
-    const senses = truncatedMeaning.split(';').map(s => s.trim()).filter(Boolean);
-    truncatedMeaning = senses.slice(0, 2).join('; ');
+  const senses = data.meaning
+    ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+    : [];
+
+  if (senses.length > 1) {
+    const meanList = document.createElement("ul");
+    meanList.className = "sol-meaning-bullets";
+    senses.forEach(sense => {
+      const li = document.createElement("li");
+      li.textContent = sense;
+      meanList.appendChild(li);
+    });
+    meanCard.appendChild(meanList);
+  } else {
+    const meanText = document.createElement("div");
+    meanText.className = "sol-meaning-summary";
+    meanText.textContent = senses.length === 1 ? senses[0] : "Meaning not established.";
+    meanCard.appendChild(meanText);
   }
-  meanText.textContent = truncatedMeaning || "Meaning not established.";
-  meanCard.appendChild(meanText);
   
   meanContent.appendChild(meanCard);
   
@@ -528,4 +567,18 @@ function renderResultPanel(queryText, data) {
   
   body.appendChild(actions);
   body.appendChild(quote);
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    renderDefaultPanel,
+    renderLoadingPanel,
+    renderErrorPanel,
+    renderResultPanel,
+    closePanel,
+    clearWatchdog,
+    getWatchdog: () => loadingWatchdog,
+    getActiveWatchdogQuery: () => activeWatchdogQuery,
+    getShadowRoot,
+  };
 }

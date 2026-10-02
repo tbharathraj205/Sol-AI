@@ -233,8 +233,9 @@ class TestSemanticCalibrationPolicy(unittest.TestCase):
     def test_09_duplicate_preservation(self):
         """Deterministic evidence remains authoritative when semantic chunk matches exact chunk."""
         # Query 'மரம்': exact passes retrieve PM-CHINTHAMANI-0939 as exact match,
-        # and semantic search also encounters PM-CHINTHAMANI-0939 (score 0.8585 >= 0.845).
-        res = self.engine.search("மரம்")
+        # Pass force_semantic=True so that both exact and semantic passes run
+        # despite deterministic short-circuit, allowing deduplication logic to be tested
+        res = self.engine.search("மரம்", force_semantic=True)
 
         all_pm_evs = [
             e for e in res.evidence
