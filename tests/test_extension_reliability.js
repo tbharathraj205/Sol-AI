@@ -18,9 +18,28 @@ function createMockElement(tag) {
     children: [],
     style: {},
     className: "",
-    textContent: "",
-    innerHTML: "",
+    _textContent: "",
+    _innerHTML: "",
     parent: null,
+    get textContent() {
+      if (this.children.length > 0) {
+        return this.children.map((c) => c.textContent || "").join("");
+      }
+      return this._textContent || "";
+    },
+    set textContent(v) {
+      this._textContent = v;
+      this.children = [];
+    },
+    get innerHTML() {
+      return this._innerHTML || "";
+    },
+    set innerHTML(v) {
+      this._innerHTML = v;
+      if (v === "") {
+        this.children = [];
+      }
+    },
     classList: {
       add: (c) => { el.className = (el.className ? el.className + " " : "") + c; },
       remove: (c) => { el.className = (el.className || "").replace(c, "").trim(); },
@@ -40,7 +59,7 @@ function createMockElement(tag) {
     querySelector: (sel) => {
       for (const child of el.children) {
         if (sel.startsWith("#") && child.id === sel.slice(1)) return child;
-        if (sel.startsWith(".") && child.classList.contains(sel.slice(1))) return child;
+        if (sel.startsWith(".") && child.classList && child.classList.contains(sel.slice(1))) return child;
         if (child.querySelector) {
           const found = child.querySelector(sel);
           if (found) return found;
@@ -59,8 +78,17 @@ function createMockElement(tag) {
   return el;
 }
 
+function createMockTextNode(text) {
+  return {
+    nodeType: 3,
+    textContent: String(text),
+    children: [],
+  };
+}
+
 global.document = {
   createElement: createMockElement,
+  createTextNode: createMockTextNode,
   body: createMockElement("body"),
 };
 
@@ -360,6 +388,87 @@ function testI_structuredMorphologyPills() {
   console.log("  [PASS] Test I: Structured morphology pills rendered cleanly.");
 }
 
+function testJ_structuredLiteraryContextAndExpansion() {
+  console.log("Running Test J: Structured literary context snippet and expansion toggle...");
+  const mockResult = {
+    lemma: "அறம்",
+    query: "அறம்",
+    senses: [{ sense_number: 1, title: "நற்செயல்", raw_text: "நற்செயல்" }],
+    morphology: { pos: "noun" },
+    literary_context: [
+      {
+        work: "திருக்குறள்",
+        verse_number: "31",
+        author: "திருவள்ளுவர்",
+        passage: "சிறப்பீனும் செல்வமும் ஈனும் அறத்தினூங்கு\nஆக்கமும் எவனோ உயிர்க்கு.",
+        matched_line: "சிறப்பீனும் செல்வமும் ஈனும் அறத்தினூங்கு",
+        snippet: "சிறப்பீனும் செல்வமும் ஈனும் அறத்தினூங்கு",
+        highlight_offsets: [{ start: 27, end: 31 }],
+        passage_highlight_offsets: [{ start: 27, end: 31 }],
+        is_featured: true,
+        can_expand: true,
+      },
+      {
+        work: "ஆத்திசூடி",
+        verse_number: "1",
+        author: "ஔவையார்",
+        passage: "அறம் செய விரும்பு.",
+        matched_line: "அறம் செய விரும்பு.",
+        snippet: "அறம் செய விரும்பு.",
+        highlight_offsets: [{ start: 0, end: 4 }],
+        passage_highlight_offsets: [{ start: 0, end: 4 }],
+        is_featured: false,
+        can_expand: false,
+      },
+    ],
+  };
+
+  dispatchMessage({ action: "SHOW_RESULT", query: "அறம்", result: mockResult });
+  const shadow = content.getShadowRoot();
+  const panel = shadow.querySelector("#sol-ai-panel");
+  const body = panel.children.find((c) => c.className === "sol-body");
+  const tabContents = body.children.filter((c) => c.className && c.className.includes("sol-tab-content"));
+  const litContent = tabContents[1]; // 2nd tab: Literary Context
+  assert.ok(litContent, "Must render literary context tab");
+  assert.strictEqual(litContent.children.length, 2, "Must render 2 literary cards");
+
+  // First card: expandable
+  const card1 = litContent.children[0];
+  const verse1 = card1.querySelector(".sol-lit-verse");
+  assert.ok(verse1, "Card 1 must contain .sol-lit-verse");
+  assert.strictEqual(verse1.textContent, "சிறப்பீனும் செல்வமும் ஈனும் அறத்தினூங்கு", "Initial render must display snippet, not full passage");
+
+  // Verify highlight span in Card 1
+  const span1 = verse1.children.find((c) => c.tagName === "SPAN");
+  assert.ok(span1, "Must render highlight span");
+  assert.strictEqual(span1.style.color, "#e5c158", "Highlight span must have gold color");
+
+  // Verify expand button exists and displays "View more"
+  const expandBtn1 = card1.querySelector(".sol-lit-expand-btn");
+  assert.ok(expandBtn1, "Card 1 must have .sol-lit-expand-btn when can_expand is true");
+  assert.strictEqual(expandBtn1.textContent, "View more", "Initial button text must be 'View more'");
+
+  // Click expand button to expand
+  expandBtn1.onclick();
+  assert.strictEqual(verse1.textContent, "சிறப்பீனும் செல்வமும் ஈனும் அறத்தினூங்கு\nஆக்கமும் எவனோ உயிர்க்கு.", "Verse must expand to full passage");
+  assert.strictEqual(expandBtn1.textContent, "Show less", "Button text must toggle to 'Show less'");
+
+  // Click again to collapse
+  expandBtn1.onclick();
+  assert.strictEqual(verse1.textContent, "சிறப்பீனும் செல்வமும் ஈனும் அறத்தினூங்கு", "Verse must collapse back to snippet");
+  assert.strictEqual(expandBtn1.textContent, "View more", "Button text must toggle back to 'View more'");
+
+  // Second card: non-expandable (can_expand is false)
+  const card2 = litContent.children[1];
+  const verse2 = card2.querySelector(".sol-lit-verse");
+  assert.ok(verse2, "Card 2 must contain .sol-lit-verse");
+  assert.strictEqual(verse2.textContent, "அறம் செய விரும்பு.");
+  const expandBtn2 = card2.querySelector(".sol-lit-expand-btn");
+  assert.strictEqual(expandBtn2, null, "Card 2 must NOT render expand button when can_expand is false");
+
+  console.log("  [PASS] Test J: Structured literary context snippet and expansion toggle verified.");
+}
+
 async function runAll() {
   testA_normalResult();
   testB_backendError();
@@ -370,7 +479,8 @@ async function runAll() {
   testG_structuredSensesConsumption();
   testH_relatedWordsMax3();
   testI_structuredMorphologyPills();
-  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (9/9)!");
+  testJ_structuredLiteraryContextAndExpansion();
+  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (10/10)!");
 }
 
 runAll().catch((err) => {

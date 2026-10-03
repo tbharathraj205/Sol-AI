@@ -124,6 +124,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+function renderHighlightedText(container, text, offsets, keywords = []) {
+  container.innerHTML = "";
+  if (!text) return;
+
+  if (offsets && offsets.length > 0) {
+    const sorted = [...offsets].sort((a, b) => a.start - b.start);
+    let cur = 0;
+    sorted.forEach((off) => {
+      if (off.start > cur) {
+        container.appendChild(document.createTextNode(text.slice(cur, off.start)));
+      }
+      const span = document.createElement("span");
+      span.style.background = "rgba(201, 162, 39, 0.3)";
+      span.style.color = "#e5c158";
+      span.style.fontWeight = "bold";
+      span.style.borderRadius = "3px";
+      span.style.padding = "1px 4px";
+      span.textContent = text.slice(off.start, off.end);
+      container.appendChild(span);
+      cur = Math.max(cur, off.end);
+    });
+    if (cur < text.length) {
+      container.appendChild(document.createTextNode(text.slice(cur)));
+    }
+    return;
+  }
+
+  // Fallback to keyword matching if offsets unavailable
+  const valid = (keywords || []).filter((k) => k && k.trim());
+  if (valid.length > 0) {
+    const escaped = valid.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const regex = new RegExp(`(${escaped})`, "gi");
+    const parts = text.split(regex);
+    parts.forEach((part) => {
+      const isMatch = valid.some((k) => k.toLowerCase() === part.toLowerCase());
+      if (isMatch) {
+        const span = document.createElement("span");
+        span.style.background = "rgba(201, 162, 39, 0.3)";
+        span.style.color = "#e5c158";
+        span.style.fontWeight = "bold";
+        span.style.borderRadius = "3px";
+        span.style.padding = "1px 4px";
+        span.textContent = part;
+        container.appendChild(span);
+      } else {
+        container.appendChild(document.createTextNode(part));
+      }
+    });
+    return;
+  }
+
+  container.textContent = text;
+}
+
 function closePanel() {
   clearWatchdog();
   if (solShadowRoot) {
@@ -593,20 +647,67 @@ function renderResultPanel(queryText, data) {
       lHead.innerHTML = `${ICONS.document} Literary Evidence (${idx + 1} of ${litArr.length})`;
       lCard.appendChild(lHead);
       
+      const fullPassage = item.passage || "";
+      const snippetText = item.snippet || item.matched_line || fullPassage;
+      const canExpand =
+        item.can_expand !== undefined
+          ? item.can_expand
+          : fullPassage.length > snippetText.length + 10 || fullPassage.includes("\n");
+
       const v = document.createElement("div");
       v.className = "sol-lit-verse";
-      v.textContent = item.passage;
+      v.style.whiteSpace = "pre-line";
+      renderHighlightedText(v, snippetText, item.highlight_offsets, [data.query, data.lemma]);
       lCard.appendChild(v);
       
       const meta = document.createElement("div");
       meta.className = "sol-lit-source";
-      meta.innerHTML = `<span>— ${item.work}${item.verse_number ? ", " + item.verse_number : ""}</span>`;
-      
+      meta.style.display = "flex";
+      meta.style.justifyContent = "space-between";
+      meta.style.alignItems = "center";
+      meta.style.flexWrap = "wrap";
+      meta.style.gap = "8px";
+
+      const sourceInfo = document.createElement("span");
+      sourceInfo.textContent = `— ${item.work || "Sangam Work"}${item.verse_number ? ", " + item.verse_number : ""}`;
+      meta.appendChild(sourceInfo);
+
+      const btnGroup = document.createElement("div");
+      btnGroup.style.display = "flex";
+      btnGroup.style.alignItems = "center";
+      btnGroup.style.gap = "8px";
+
+      if (canExpand) {
+        const expandBtn = document.createElement("button");
+        expandBtn.className = "sol-lit-expand-btn";
+        expandBtn.style.color = "#E5C158";
+        expandBtn.style.background = "transparent";
+        expandBtn.style.border = "none";
+        expandBtn.style.fontSize = "11px";
+        expandBtn.style.cursor = "pointer";
+        expandBtn.style.padding = "0";
+        expandBtn.style.textDecoration = "underline";
+        expandBtn.textContent = "View more";
+        let isExp = false;
+        expandBtn.onclick = () => {
+          isExp = !isExp;
+          if (isExp) {
+            renderHighlightedText(v, fullPassage, item.passage_highlight_offsets, [data.query, data.lemma]);
+            expandBtn.textContent = "Show less";
+          } else {
+            renderHighlightedText(v, snippetText, item.highlight_offsets, [data.query, data.lemma]);
+            expandBtn.textContent = "View more";
+          }
+        };
+        btnGroup.appendChild(expandBtn);
+      }
+
       const link = document.createElement("button");
       link.className = "sol-view-context-btn";
       link.innerHTML = `View in context ${ICONS.arrowRight}`;
-      meta.appendChild(link);
-      
+      btnGroup.appendChild(link);
+
+      meta.appendChild(btnGroup);
       lCard.appendChild(meta);
       litContent.appendChild(lCard);
     });

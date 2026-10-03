@@ -170,20 +170,12 @@ class SOLAPIRequestHandler(BaseHTTPRequestHandler):
                     response.related_words = rel_words
 
                 # 2. Literary Context
-                from backend.interpretation.schemas import LiteraryContextItem
-                lit_items = []
-                for ev in pack.literary_evidence:
-                    lit_items.append(
-                        LiteraryContextItem(
-                            work=ev.work or ev.metadata.get("source_text"),
-                            author=ev.author,
-                            period=ev.period or ev.metadata.get("period"),
-                            passage=ev.passage or ev.metadata.get("classical_tamil"),
-                            verse_number=str(ev.metadata.get("verse_number", ev.metadata.get("verse_id", ""))),
-                            meaning=ev.meaning or ev.metadata.get("modern_tamil"),
-                            source=ev.source or "Sentamizh",
-                        )
-                    )
+                from backend.interpretation.literary_processor import process_literary_evidence
+                lit_items = process_literary_evidence(
+                    pack.literary_evidence,
+                    query=query,
+                    lemma=response.lemma,
+                )
                 if lit_items:
                     response.literary_context = lit_items
                 

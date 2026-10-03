@@ -12,56 +12,52 @@ export default function LiteraryContextCard({ contexts = [], query = "", lemma =
     setExpandedItems((prev) => ({ ...prev, [idx]: !prev[idx] }));
   };
 
-  const getRelevantLine = (text, queryKeyword, lemmaKeyword) => {
+  const renderHighlightedText = (text, offsets, queryKeyword, lemmaKeyword) => {
     if (!text) return "";
-    // Split by newline or standard sentence-ending punctuation
-    const sentences = text.split(/(?<=[.!?\n|])\s+/);
-    const keywords = [queryKeyword, lemmaKeyword].filter(k => k && k.trim());
-    
-    const match = sentences.find((sentence) => 
-      keywords.some(k => sentence.toLowerCase().includes(k.toLowerCase()))
-    );
-    
-    let result = match ? match.trim() : sentences[0].trim();
-    
-    // If the matched sentence is extremely long, truncate it around the keyword
-    if (result.length > 120) {
-       const keywordIndex = keywords.reduce((idx, k) => {
-         const kIdx = result.toLowerCase().indexOf(k.toLowerCase());
-         return kIdx !== -1 && (idx === -1 || kIdx < idx) ? kIdx : idx;
-       }, -1);
-       
-       if (keywordIndex > -1) {
-           const start = Math.max(0, keywordIndex - 40);
-           const end = Math.min(result.length, keywordIndex + 80);
-           result = (start > 0 ? "... " : "") + result.substring(start, end).trim() + (end < result.length ? " ..." : "");
-       } else {
-           result = result.substring(0, 120) + "...";
-       }
-    }
-    
-    return result;
-  };
 
-  const highlightText = (text, queryKeyword, lemmaKeyword) => {
-    if (!text) return text;
-    const keywords = [queryKeyword, lemmaKeyword].filter(k => k && k.trim());
+    // 1. Primary: Render using backend-provided character offsets
+    if (offsets && offsets.length > 0) {
+      const sortedOffsets = [...offsets].sort((a, b) => a.start - b.start);
+      const elements = [];
+      let currentIdx = 0;
+
+      sortedOffsets.forEach((offset, idx) => {
+        if (offset.start > currentIdx) {
+          elements.push(text.slice(currentIdx, offset.start));
+        }
+        elements.push(
+          <span key={`hl-${idx}`} className="bg-[#C9A227]/30 text-[#E5C158] font-bold rounded px-1">
+            {text.slice(offset.start, offset.end)}
+          </span>
+        );
+        currentIdx = Math.max(currentIdx, offset.end);
+      });
+
+      if (currentIdx < text.length) {
+        elements.push(text.slice(currentIdx));
+      }
+      return elements;
+    }
+
+    // 2. Fallback: Keyword matching if offsets unavailable
+    const keywords = [queryKeyword, lemmaKeyword].filter((k) => k && k.trim());
     if (keywords.length === 0) return text;
 
-    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = keywords.map(escapeRegExp).join('|');
-    const regex = new RegExp(`(${pattern})`, 'gi');
-    
-    const lines = text.split('\n');
-    
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = keywords.map(escapeRegExp).join("|");
+    const regex = new RegExp(`(${pattern})`, "gi");
+
+    const lines = text.split("\n");
     return lines.map((line, lineIdx) => {
       const parts = line.split(regex);
       return (
         <span key={lineIdx}>
           {parts.map((part, i) => {
-            const isMatch = keywords.some(k => part.toLowerCase() === k.toLowerCase());
+            const isMatch = keywords.some((k) => part.toLowerCase() === k.toLowerCase());
             return isMatch ? (
-              <span key={i} className="bg-[#C9A227]/30 text-[#E5C158] font-bold rounded px-1">{part}</span>
+              <span key={i} className="bg-[#C9A227]/30 text-[#E5C158] font-bold rounded px-1">
+                {part}
+              </span>
             ) : (
               part
             );
@@ -109,10 +105,16 @@ export default function LiteraryContextCard({ contexts = [], query = "", lemma =
       <div className="space-y-4">
         {visibleList.map((item, idx) => {
           const isItemExpanded = expandedItems[idx];
-          const textContent = item.quote || item.text_segment || item.passage || "";
-          
-          const relevantLine = getRelevantLine(textContent, query, lemma);
-          const canExpand = textContent.length > relevantLine.length + 10 || textContent.includes('\n');
+          const fullPassage = item.passage || item.quote || item.text_segment || "";
+          const snippetText = item.snippet || item.matched_line || fullPassage;
+          const canExpand =
+            item.can_expand !== undefined
+              ? item.can_expand
+              : fullPassage.length > snippetText.length + 10 || fullPassage.includes("\n");
+          const activeText = isItemExpanded ? fullPassage : snippetText;
+          const activeOffsets = isItemExpanded
+            ? item.passage_highlight_offsets || []
+            : item.highlight_offsets || [];
 
           return (
             <div
@@ -121,10 +123,8 @@ export default function LiteraryContextCard({ contexts = [], query = "", lemma =
             >
               {/* Left Side: Verse, Source & Translation */}
               <div className="flex-1 space-y-2">
-                <div className="text-base sm:text-lg font-serif-tamil text-[#F7F3EA] leading-relaxed italic pl-3 border-l-2 border-[#C9A227]">
-                  “{isItemExpanded 
-                    ? highlightText(textContent, query, lemma) 
-                    : highlightText(relevantLine, query, lemma)}”
+                <div className="text-base sm:text-lg font-serif-tamil text-[#F7F3EA] leading-relaxed italic pl-3 border-l-2 border-[#C9A227] whitespace-pre-line">
+                  “{renderHighlightedText(activeText, activeOffsets, query, lemma)}”
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 pl-3">

@@ -105,19 +105,12 @@ class MockLLMInterpreter(BaseLLMInterpreter):
             )
 
         # Build literary context items
-        lit_items: List[LiteraryContextItem] = []
-        for ev in pack.literary_evidence:
-            lit_items.append(
-                LiteraryContextItem(
-                    work=ev.work or ev.metadata.get("source_text"),
-                    author=ev.author,
-                    period=ev.period or ev.metadata.get("period"),
-                    passage=ev.passage or ev.metadata.get("classical_tamil"),
-                    verse_number=str(ev.metadata.get("verse_number", ev.metadata.get("verse_id", ""))),
-                    meaning=ev.meaning or ev.metadata.get("modern_tamil"),
-                    source=ev.source or "Sentamizh",
-                )
-            )
+        from backend.interpretation.literary_processor import process_literary_evidence
+        lit_items = process_literary_evidence(
+            pack.literary_evidence,
+            query=pack.query,
+            lemma=lemma,
+        )
 
         # Related words
         rel_words: List[str] = []

@@ -7,8 +7,15 @@ from pydantic import BaseModel, Field
 from backend.schemas.evidence import Evidence
 
 
+class HighlightOffset(BaseModel):
+    """Character offsets [start, end) within text for highlighting."""
+
+    start: int = Field(description="0-based start character index (inclusive)")
+    end: int = Field(description="0-based end character index (exclusive)")
+
+
 class LiteraryContextItem(BaseModel):
-    """Represents a single selected literary context occurrence."""
+    """Represents a single selected literary context occurrence with structured context."""
 
     work: Optional[str] = Field(default=None, description="Name of the literary work (e.g. Kuruntokai)")
     author: Optional[str] = Field(default=None, description="Author if available")
@@ -17,6 +24,14 @@ class LiteraryContextItem(BaseModel):
     verse_number: Optional[str] = Field(default=None, description="Verse or line number")
     meaning: Optional[str] = Field(default=None, description="Modern Tamil translation or meaning")
     source: str = Field(default="Sentamizh", description="Source corpus name")
+
+    # Phase 3: Centralized Context & Snippet Processing
+    matched_line: Optional[str] = Field(default=None, description="Specific line/sentence containing the keyword match")
+    snippet: Optional[str] = Field(default=None, description="Presentation-ready contextual snippet/window")
+    highlight_offsets: List[HighlightOffset] = Field(default_factory=list, description="Highlight offsets within snippet")
+    passage_highlight_offsets: List[HighlightOffset] = Field(default_factory=list, description="Highlight offsets within full passage")
+    is_featured: bool = Field(default=False, description="True if this occurrence is top-ranked / featured")
+    can_expand: bool = Field(default=False, description="True if passage offers additional context beyond snippet")
 
 
 class LexicalSenseItem(BaseModel):
