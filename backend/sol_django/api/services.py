@@ -19,11 +19,14 @@ from typing import Optional, List, Dict, Any
 from backend.retrieval.engine import RetrievalEngine
 from backend.interpretation.evidence_pack import build_evidence_pack
 from backend.interpretation import interpreter as interpreter_module
+from backend.interpretation.wsd import TamilWSD
 from backend.interpretation.schemas import (
     EvidencePack,
     SOLResponse,
     LiteraryContextItem,
     LexicalSenseItem,
+    WSDResult,
+    extract_sense_candidates,
     parse_senses_from_meaning_string,
 )
 
@@ -98,12 +101,22 @@ class SOLServiceRegistry:
         # 2. Evidence Pack
         pack = build_evidence_pack(retrieval_result, query_context=context)
 
-        # 3. Interpreter resolution (raises ValueError on bad provider or missing required key)
+        # 3. Deterministic WSD (Authoritative single execution per query)
+        wsd = TamilWSD()
+        candidates = extract_sense_candidates(pack, query=clean_query)
+        wsd_result = wsd.disambiguate(
+            query=clean_query,
+            context_sentence=context,
+            candidate_senses=candidates,
+        )
+        pack.wsd_result = wsd_result
+
+        # 4. Interpreter resolution (raises ValueError on bad provider or missing required key)
         interpreter = interpreter_module.get_interpreter(provider)
 
-        # 4. Interpret with fallback cascade
+        # 5. Interpret with fallback cascade (consuming the authoritative wsd_result)
         try:
-            response = interpreter.interpret(pack)
+            response = interpreter.interpret(pack, wsd_result=wsd_result)
         except Exception as primary_err:
             logger.warning("Primary LLM Error: %s", primary_err)
 
@@ -113,29 +126,27 @@ class SOLServiceRegistry:
                 logger.info("Attempting Groq fallback...")
                 try:
                     groq_interpreter = interpreter_module.get_interpreter("groq")
-                    response = groq_interpreter.interpret(pack)
+                    response = groq_interpreter.interpret(pack, wsd_result=wsd_result)
                 except Exception as groq_err:
                     logger.warning(
                         "Groq Fallback Error: %s. Falling back to deterministic mock interpreter.",
                         groq_err,
                     )
                     fallback_interpreter = interpreter_module.get_interpreter("mock")
-                    response = fallback_interpreter.interpret(pack)
-                    response.contextual_meaning = None
+                    response = fallback_interpreter.interpret(pack, wsd_result=wsd_result)
                     response.uncertainties.append(
                         "AI Contextual Interpretation is currently unavailable due to high server load."
                     )
             else:
                 logger.info("Falling back to deterministic mock interpreter.")
                 fallback_interpreter = interpreter_module.get_interpreter("mock")
-                response = fallback_interpreter.interpret(pack)
-                response.contextual_meaning = None
+                response = fallback_interpreter.interpret(pack, wsd_result=wsd_result)
                 response.uncertainties.append(
                     "AI Contextual Interpretation is currently unavailable due to high server load."
                 )
 
-        # 5. Deterministic Structural Overrides
-        self._apply_post_overrides(pack=pack, response=response, query=clean_query)
+        # 6. Deterministic Structural Overrides
+        self._apply_post_overrides(pack=pack, response=response, query=clean_query, wsd_result=wsd_result)
 
         return response
 
@@ -144,6 +155,7 @@ class SOLServiceRegistry:
         pack: EvidencePack,
         response: SOLResponse,
         query: str,
+        wsd_result: Optional[WSDResult] = None,
     ) -> None:
         """
         Inject deterministic structural evidence from EvidencePack into SOLResponse
@@ -166,22 +178,31 @@ class SOLServiceRegistry:
         elif response.senses and not response.meaning:
             response.meaning = "; ".join(s.raw_text or s.title for s in response.senses)
 
-        # 2. Contextual Meaning Override / Deterministic Disambiguation
-        if pack.query_context and pack.query_context.strip():
-            candidate_senses = [ev.meaning for ev in pack.lexical_evidence if ev.meaning]
-            if candidate_senses:
-                from backend.interpretation.wsd import TamilWSD
-                wsd = TamilWSD()
-                sel_sense, score, _ = wsd.disambiguate(
-                    query=query,
-                    context_sentence=pack.query_context,
-                    candidate_senses=candidate_senses,
-                )
-                response.contextual_meaning = sel_sense
-                if sel_sense is None and not any("ambiguity" in u.lower() or "context" in u.lower() for u in response.uncertainties):
-                    response.uncertainties.append(
-                        "Contextual sense ambiguity: The provided context does not establish sufficient discriminative evidence to select a unique lexical sense."
+        # 2. Contextual Meaning Override / Authoritative Deterministic WSD Result
+        wsd_res = wsd_result or getattr(pack, "wsd_result", None)
+        if wsd_res is not None:
+            response.wsd_result = wsd_res
+            response.contextual_meaning = wsd_res.selected_sense
+            if wsd_res.selected_sense is None and pack.query_context and pack.query_context.strip():
+                if wsd_res.status in ("ambiguous", "insufficient_evidence", "conflicting_signals"):
+                    amb_msg = (
+                        f"Contextual sense ambiguity: {wsd_res.reasons[0]}"
+                        if wsd_res.reasons
+                        else "Contextual sense ambiguity: The provided context does not establish sufficient discriminative evidence to select a unique lexical sense."
                     )
+                    if not any("ambiguity" in u.lower() or "context" in u.lower() for u in response.uncertainties):
+                        response.uncertainties.append(amb_msg)
+        elif pack.query_context and pack.query_context.strip():
+            # Fallback if wsd_result was omitted
+            candidates = extract_sense_candidates(pack, query=query)
+            wsd = TamilWSD()
+            fallback_res = wsd.disambiguate(
+                query=query,
+                context_sentence=pack.query_context,
+                candidate_senses=candidates,
+            )
+            response.wsd_result = fallback_res
+            response.contextual_meaning = fallback_res.selected_sense
         else:
             response.contextual_meaning = None
 

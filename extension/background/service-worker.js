@@ -19,15 +19,94 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+/**
+ * Checks if a tab URL is restricted by Chrome security policy where content scripts cannot run.
+ */
+function isRestrictedUrl(url) {
+  if (!url) return false;
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("edge://") ||
+    url.startsWith("about:") ||
+    url.startsWith("devtools://") ||
+    url.startsWith("view-source:") ||
+    url.includes("chromewebstore.google.com") ||
+    url.includes("chrome.google.com/webstore")
+  );
+}
+
+/**
+ * Ensures the content script is injected and actively listening in the target tab.
+ * Injects scripts dynamically if the tab was opened before extension reload.
+ */
+async function ensureContentScriptReady(tabId, url) {
+  if (isRestrictedUrl(url)) {
+    return false;
+  }
+
+  // 1. Check if content script is already listening via PING
+  try {
+    const res = await chrome.tabs.sendMessage(tabId, { action: "PING" });
+    if (res && res.status === "ok") {
+      return true;
+    }
+  } catch (e) {
+    // Content script not listening yet; attempt injection below
+  }
+
+  // 2. Programmatically inject content scripts if available
+  try {
+    if (chrome.scripting) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["config/config.js", "content/content.js"],
+      });
+      await chrome.scripting.insertCSS({
+        target: { tabId },
+        files: ["content/content.css"],
+      });
+      // Small pause to allow content script initialization
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return true;
+    }
+  } catch (injErr) {
+    console.warn(`[SOL AI] Could not inject content script into tab ${tabId}:`, injErr.message);
+  }
+
+  return false;
+}
+
+/**
+ * Safe message dispatcher to tabs that handles delivery errors gracefully.
+ * Never throws unhandled promise rejections.
+ */
+async function sendMessageToTab(tabId, message) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (err) {
+    console.warn(`[SOL AI] Message '${message?.action}' not delivered to tab ${tabId}:`, err.message);
+    return null;
+  }
+}
+
 // Context menu click handler
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== CONTEXT_MENU_ID || !tab || !tab.id) return;
 
+  if (isRestrictedUrl(tab.url)) {
+    console.warn("[SOL AI] Cannot run on browser internal or restricted pages:", tab.url);
+    return;
+  }
+
   const rawText = info.selectionText || "";
   const queryText = rawText.trim();
 
+  // Ensure content script is ready in this tab
+  await ensureContentScriptReady(tab.id, tab.url);
+
   if (!queryText) {
-    chrome.tabs.sendMessage(tab.id, {
+    await sendMessageToTab(tab.id, {
       action: "SHOW_ERROR",
       error: "Select a Tamil word or phrase first.",
     });
@@ -38,16 +117,16 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     // 1. Request surrounding context from the content script FIRST (before modifying DOM)
     let contextText = "";
     try {
-      const contextResponse = await chrome.tabs.sendMessage(tab.id, { action: "GET_CONTEXT" });
+      const contextResponse = await sendMessageToTab(tab.id, { action: "GET_CONTEXT" });
       if (contextResponse && contextResponse.context) {
         contextText = contextResponse.context;
       }
     } catch (e) {
-      console.warn("Could not retrieve context from content script:", e);
+      console.warn("[SOL AI] Could not retrieve context from content script:", e);
     }
 
     // 1.5 Notify content script to open panel in LOADING state
-    chrome.tabs.sendMessage(tab.id, {
+    await sendMessageToTab(tab.id, {
       action: "SHOW_LOADING",
       query: queryText,
     });
@@ -70,7 +149,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       if (fetchErr.name === "AbortError") {
         errorMsg = "SOL AI took too long to respond (request timed out).";
       }
-      chrome.tabs.sendMessage(tab.id, {
+      await sendMessageToTab(tab.id, {
         action: "SHOW_ERROR",
         error: errorMsg,
         query: queryText,
@@ -83,7 +162,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     try {
       data = await response.json();
     } catch (jsonErr) {
-      chrome.tabs.sendMessage(tab.id, {
+      await sendMessageToTab(tab.id, {
         action: "SHOW_ERROR",
         error: "Received invalid response format from SOL AI server.",
         query: queryText,
@@ -96,7 +175,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       const errDetail = (data && typeof data === "object" && data.error)
         ? data.error
         : `SOL AI API returned HTTP status ${response.status}.`;
-      chrome.tabs.sendMessage(tab.id, {
+      await sendMessageToTab(tab.id, {
         action: "SHOW_ERROR",
         error: errDetail,
         query: queryText,
@@ -106,7 +185,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 
     // 3. Send structured response to content script
-    chrome.tabs.sendMessage(tab.id, {
+    await sendMessageToTab(tab.id, {
       action: "SHOW_RESULT",
       query: queryText,
       result: data,
@@ -117,7 +196,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       errorMsg = "SOL AI took too long to respond (request timed out).";
     }
 
-    chrome.tabs.sendMessage(tab.id, {
+    await sendMessageToTab(tab.id, {
       action: "SHOW_ERROR",
       error: errorMsg,
       query: queryText,

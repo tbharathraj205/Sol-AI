@@ -2,7 +2,7 @@
 Pydantic schemas and dataclasses for the SOL AI Contextual Interpretation Layer.
 """
 
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Set, Tuple
 from pydantic import BaseModel, Field
 from backend.schemas.evidence import Evidence
 
@@ -42,6 +42,63 @@ class LexicalSenseItem(BaseModel):
     description: Optional[str] = Field(default=None, description="Detailed explanation or gloss if available")
     english_translation: Optional[str] = Field(default=None, description="English translation if available")
     raw_text: Optional[str] = Field(default=None, description="Full raw sense text")
+
+
+class SenseCandidate(BaseModel):
+    """
+    Structured candidate sense representation for contextual WSD.
+    Preserves resource provenance, headword, POS, definition gloss,
+    English translation, and raw text.
+    """
+    source: str = Field(default="", description="Contributing resource name (e.g. Tamil Wiktionary, Thani Thamizh Akarathi)")
+    headword: str = Field(description="Headword/lemma for this sense")
+    definition: str = Field(description="Tamil definition or gloss text")
+    english_meaning: Optional[str] = Field(default=None, description="English translation if available")
+    pos: Optional[str] = Field(default=None, description="Part of speech if available")
+    raw_text: Optional[str] = Field(default=None, description="Full raw sense text as received from source")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Source provenance and metadata")
+    sense_id: Optional[str] = Field(default=None, description="Stable identifier for the candidate")
+
+    @property
+    def gloss(self) -> str:
+        return self.definition
+
+
+class CandidateScore(BaseModel):
+    """
+    Evaluated scoring record for a candidate sense during WSD.
+    """
+    candidate: SenseCandidate
+    score: float = Field(description="Deterministic evidence strength score")
+    reasons: List[str] = Field(default_factory=list, description="Scoring breakdown signals")
+    formatted_text: Optional[str] = Field(default=None, description="Contextual formatted text if applicable")
+
+
+class WSDResult(BaseModel):
+    """
+    Authoritative result of deterministic Word-Sense Disambiguation.
+    Retains selected candidate, formatted sense text, evidence strength score,
+    confidence level, status, explanation reasons, and competing candidate scores.
+    """
+    query: str = Field(description="Target query word")
+    context: Optional[str] = Field(default=None, description="Surrounding context sentence")
+    selected_candidate: Optional[SenseCandidate] = Field(default=None, description="Selected winning sense candidate")
+    selected_sense: Optional[str] = Field(default=None, description="Final selected contextual sense text")
+    score: float = Field(default=0.0, description="Raw deterministic evidence strength score of selected sense")
+    status: str = Field(
+        default="no_context",
+        description="Disambiguation status: 'selected', 'no_context', 'insufficient_evidence', 'ambiguous', 'conflicting_signals', 'single_sense'"
+    )
+    confidence: str = Field(
+        default="none",
+        description="Categorical confidence level: 'high', 'medium', 'low', 'none'"
+    )
+    reasons: List[str] = Field(default_factory=list, description="Explanatory reasons for selection or abstention")
+    candidates: List[CandidateScore] = Field(default_factory=list, description="All evaluated candidate senses with scores and reasons")
+
+    def __iter__(self):
+        """Allow backwards-compatible unpacking as (selected_sense, score, reasons)."""
+        return iter((self.selected_sense, self.score, self.reasons))
 
 
 class MorphemeSegment(BaseModel):
@@ -131,6 +188,57 @@ def parse_senses_from_meaning_string(
     return build_lexical_senses(raw_senses, eng_senses)
 
 
+def extract_sense_candidates(
+    pack_or_evidence: Union["EvidencePack", List[Evidence]],
+    query: Optional[str] = None,
+) -> List[SenseCandidate]:
+    """
+    Extract structured SenseCandidate objects from EvidencePack or lexical Evidence list.
+    Preserves individual definitions from Wiktionary, preserves source entries from Akarathi,
+    and excludes items without glosses (such as WordNet records with meaning=None).
+    """
+    if hasattr(pack_or_evidence, "lexical_evidence"):
+        ev_list = pack_or_evidence.lexical_evidence
+        q = query or getattr(pack_or_evidence, "query", "")
+    else:
+        ev_list = pack_or_evidence
+        q = query or ""
+
+    candidates: List[SenseCandidate] = []
+    seen: Set[Tuple[str, str]] = set()
+
+    for idx, ev in enumerate(ev_list):
+        if not ev.meaning or not str(ev.meaning).strip():
+            # Exclude records without definitions (e.g. Tamil WordNet where meaning=None)
+            continue
+
+        raw_meaning = str(ev.meaning).strip()
+        hw = ev.lemma or ev.surface or q
+        src = ev.source or "Lexical Resource"
+
+        # Deduplicate identical (source, definition)
+        key = (src, raw_meaning)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        cand_id = ev.source_id or f"{src.lower().replace(' ', '_')}:{hw}:{idx}"
+        candidates.append(
+            SenseCandidate(
+                source=src,
+                headword=hw,
+                definition=raw_meaning,
+                english_meaning=ev.english_meaning,
+                pos=ev.pos,
+                raw_text=raw_meaning,
+                metadata=dict(ev.metadata) if ev.metadata else {},
+                sense_id=cand_id,
+            )
+        )
+
+    return candidates
+
+
 class SOLResponse(BaseModel):
     """
     Structured response schema for SOL AI interpretation layer.
@@ -153,6 +261,9 @@ class SOLResponse(BaseModel):
     )
     contextual_interpretation: Optional[str] = Field(
         default=None, description="Grounded explanation synthesizing available evidence without fabrication"
+    )
+    wsd_result: Optional[WSDResult] = Field(
+        default=None, description="Detailed deterministic WSD analysis result"
     )
     literary_context: List[LiteraryContextItem] = Field(
         default_factory=list, description="Selected representative classical literary verses/passages"
@@ -188,6 +299,9 @@ class EvidencePack(BaseModel):
     conflicts: List[Dict[str, Any]] = Field(default_factory=list)
     source_provenance: Dict[str, Any] = Field(default_factory=dict)
     evidence_counts: Dict[str, int] = Field(default_factory=dict)
+    wsd_result: Optional[WSDResult] = Field(
+        default=None, description="Authoritative deterministic WSD result passed to interpreters"
+    )
 
     class Config:
         arbitrary_types_allowed = True

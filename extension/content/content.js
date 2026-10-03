@@ -59,6 +59,10 @@ function getShadowRoot() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "PING") {
+    sendResponse({ status: "ok" });
+    return true;
+  }
   if (message.action === "GET_CONTEXT") {
     let contextText = "";
     try {

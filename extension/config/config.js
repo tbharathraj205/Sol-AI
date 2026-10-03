@@ -4,7 +4,7 @@
  * The browser extension NEVER handles Gemini API keys directly; keys remain server-side.
  */
 
-const DEFAULT_CONFIG = {
+var DEFAULT_CONFIG = typeof DEFAULT_CONFIG !== "undefined" ? DEFAULT_CONFIG : {
   SOL_API_BASE_URL: "http://127.0.0.1:8000",
   DEFAULT_PROVIDER: "mock",
   TIMEOUT_MS: 24000,

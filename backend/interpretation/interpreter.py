@@ -17,6 +17,9 @@ from backend.interpretation.schemas import (
     LiteraryContextItem,
     LexicalSenseItem,
     build_lexical_senses,
+    SenseCandidate,
+    WSDResult,
+    extract_sense_candidates,
 )
 from backend.interpretation.prompts import SYSTEM_PROMPT, format_evidence_prompt
 
@@ -29,9 +32,14 @@ class BaseLLMInterpreter(ABC):
     """
 
     @abstractmethod
-    def interpret(self, pack: EvidencePack) -> SOLResponse:
+    def interpret(
+        self,
+        pack: EvidencePack,
+        wsd_result: Optional[WSDResult] = None
+    ) -> SOLResponse:
         """
         Receives an EvidencePack and returns a structured SOLResponse.
+        Consumes the authoritative deterministic WSDResult if available.
         """
         pass
 
@@ -51,7 +59,11 @@ class MockLLMInterpreter(BaseLLMInterpreter):
             self._wsd = TamilWSD()
         return self._wsd
 
-    def interpret(self, pack: EvidencePack) -> SOLResponse:
+    def interpret(
+        self,
+        pack: EvidencePack,
+        wsd_result: Optional[WSDResult] = None
+    ) -> SOLResponse:
         query = pack.query
         norm_query = pack.normalized_query
 
@@ -154,24 +166,33 @@ class MockLLMInterpreter(BaseLLMInterpreter):
         for conf in pack.conflicts:
             uncertainties.append(f"Conflict: {conf.get('description')}")
 
-        # Contextual interpretation synthesis via deterministic Tamil WSD
-        contextual_meaning_mock = None
-        if pack.query_context and pack.query_context.strip():
-            candidate_senses = [ev.meaning for ev in pack.lexical_evidence if ev.meaning]
-            if candidate_senses:
+        # Contextual interpretation synthesis via deterministic Tamil WSD (authoritative single execution)
+        wsd_res = wsd_result or getattr(pack, "wsd_result", None)
+        if wsd_res is None and pack.query_context and pack.query_context.strip():
+            # If wsd_result was not passed from service layer, execute WSD once as fallback
+            candidate_objects = extract_sense_candidates(pack)
+            if candidate_objects:
                 wsd = self._get_wsd()
-                selected_sense, conf_score, wsd_reasons = wsd.disambiguate(
+                wsd_res = wsd.disambiguate(
                     query=query,
                     context_sentence=pack.query_context,
-                    candidate_senses=candidate_senses,
+                    candidate_senses=candidate_objects,
                 )
-                if selected_sense:
-                    contextual_meaning_mock = selected_sense
-                else:
-                    contextual_meaning_mock = None
-                    uncertainties.append(
-                        f"Contextual sense ambiguity: The provided context does not establish sufficient discriminative evidence to select a unique lexical sense."
+
+        contextual_meaning_mock = None
+        if wsd_res:
+            if wsd_res.selected_sense:
+                contextual_meaning_mock = wsd_res.selected_sense
+            elif pack.query_context and pack.query_context.strip():
+                contextual_meaning_mock = None
+                if wsd_res.status in ("ambiguous", "insufficient_evidence", "conflicting_signals"):
+                    amb_reason = (
+                        f"Contextual sense ambiguity: {wsd_res.reasons[0]}"
+                        if wsd_res.reasons
+                        else "Contextual sense ambiguity: The provided context does not establish sufficient discriminative evidence to select a unique lexical sense."
                     )
+                    if not any("ambiguity" in u.lower() or "context" in u.lower() for u in uncertainties):
+                        uncertainties.append(amb_reason)
 
         if pack.evidence_counts.get("total_found", 0) == 0:
             interpretation = (
@@ -207,6 +228,7 @@ class MockLLMInterpreter(BaseLLMInterpreter):
             morphology=morph_dict,
             contextual_meaning=contextual_meaning_mock,
             contextual_interpretation=interpretation,
+            wsd_result=wsd_res,
             literary_context=lit_items,
             related_words=rel_words,
             sources=sources,
@@ -226,9 +248,14 @@ class GeminiLLMInterpreter(BaseLLMInterpreter):
             raise ValueError("GEMINI_API_KEY environment variable is not configured. Set GEMINI_API_KEY or use SOL_LLM_PROVIDER=mock.")
         self.model = model or os.environ.get("SOL_GEMINI_MODEL", "gemini-3.6-flash")
 
-    def interpret(self, pack: EvidencePack) -> SOLResponse:
+    def interpret(
+        self,
+        pack: EvidencePack,
+        wsd_result: Optional[WSDResult] = None
+    ) -> SOLResponse:
+        wsd_res = wsd_result or getattr(pack, "wsd_result", None)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
-        prompt_text = format_evidence_prompt(pack)
+        prompt_text = format_evidence_prompt(pack, wsd_result=wsd_res)
 
         payload = {
             "contents": [
@@ -254,7 +281,12 @@ class GeminiLLMInterpreter(BaseLLMInterpreter):
                 data = json.loads(resp.read().decode("utf-8"))
                 text_content = data["candidates"][0]["content"]["parts"][0]["text"]
                 json_data = json.loads(text_content)
-                return SOLResponse(**json_data)
+                sol_resp = SOLResponse(**json_data)
+                if wsd_res:
+                    sol_resp.wsd_result = wsd_res
+                    if wsd_res.selected_sense:
+                        sol_resp.contextual_meaning = wsd_res.selected_sense
+                return sol_resp
         except urllib.error.HTTPError as err:
             err_msg = err.read().decode("utf-8") if err.fp else str(err)
             raise RuntimeError(f"Gemini API Error (HTTP {err.code}): {err_msg[:200]}")
@@ -275,9 +307,14 @@ class GroqLLMInterpreter(BaseLLMInterpreter):
             raise ValueError("GROQ_API_KEY environment variable is not configured. Set GROQ_API_KEY or use SOL_LLM_PROVIDER=mock.")
         self.model = model or os.environ.get("SOL_GROQ_MODEL", "qwen/qwen3.8-27b")
 
-    def interpret(self, pack: EvidencePack) -> SOLResponse:
+    def interpret(
+        self,
+        pack: EvidencePack,
+        wsd_result: Optional[WSDResult] = None
+    ) -> SOLResponse:
+        wsd_res = wsd_result or getattr(pack, "wsd_result", None)
         url = "https://api.groq.com/openai/v1/chat/completions"
-        prompt_text = format_evidence_prompt(pack)
+        prompt_text = format_evidence_prompt(pack, wsd_result=wsd_res)
 
         payload = {
             "model": self.model,
@@ -304,7 +341,12 @@ class GroqLLMInterpreter(BaseLLMInterpreter):
                 data = json.loads(resp.read().decode("utf-8"))
                 text_content = data["choices"][0]["message"]["content"]
                 json_data = json.loads(text_content)
-                return SOLResponse(**json_data)
+                sol_resp = SOLResponse(**json_data)
+                if wsd_res:
+                    sol_resp.wsd_result = wsd_res
+                    if wsd_res.selected_sense:
+                        sol_resp.contextual_meaning = wsd_res.selected_sense
+                return sol_resp
         except urllib.error.HTTPError as err:
             err_msg = err.read().decode("utf-8") if err.fp else str(err)
             raise RuntimeError(f"Groq API Error (HTTP {err.code}): {err_msg[:200]}")

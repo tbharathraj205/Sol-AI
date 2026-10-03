@@ -2,7 +2,8 @@
 System prompts and evidence prompt formatting templates for the SOL AI LLM Interpreter.
 """
 
-from backend.interpretation.schemas import EvidencePack
+from typing import Optional
+from backend.interpretation.schemas import EvidencePack, WSDResult
 
 SYSTEM_PROMPT = """You are the interpretation layer of SOL AI, a Tamil Etymological and Morphological Intelligence system.
 
@@ -16,15 +17,14 @@ CRITICAL INSTRUCTIONS & GROUNDING RULES:
    - CORE FST ANALYSIS > LEXICAL MAPPING > GUESSER ANALYSIS.
    - Core analyses take precedence over guesser analyses, but guesser evidence must still be disclosed in uncertainties if present.
 7. Distinguish DIRECTLY SUPPORTED facts from CONTEXTUAL INTERPRETATION and UNCERTAINTIES.
-8. CONTEXT-AWARE POLYSEMY & WORD-SENSE DISAMBIGUATION (WSD):
+8. CONTEXT-AWARE SENSE INTERPRETATION & DETERMINISTIC WSD HANDOFF:
    - The user's highlighted word may be polysemous (பலபொருள் ஒரு சொல்).
-   - The supplied "Query Context (User Sentence)" is the primary evidence for determining which lexical sense of the queried word is intended.
-   - Do NOT simply return the most common or dominant dictionary meaning for "contextual_meaning".
-   - Compare the candidate meanings/senses in the EvidencePack against the actual user sentence.
-   - For "contextual_meaning": Select and return ONLY the specific documented lexical sense that best fits the user's context sentence. MUST BE WRITTEN IN TAMIL (தமிழ்).
-   - "meaning" MUST still contain the general documented definitions/senses (separated by semicolons). Do NOT collapse general meaning and contextual meaning into the same field.
+   - The deterministic Python WSD layer has already evaluated the user context against all candidate senses and determined the authoritative contextual sense.
+   - Treat the deterministic WSD selection as authoritative.
+   - For "contextual_meaning": Return the exact selected sense provided by the deterministic WSD layer in the prompt. If WSD abstained or returned null, "contextual_meaning" MUST be null. Do NOT replace it with another candidate.
+   - For "contextual_interpretation": Synthesize and explain why the selected sense fits the supplied context sentence and evidence. MUST BE WRITTEN IN TAMIL (தமிழ்). If WSD abstained or found ambiguity, explain the contextual uncertainty rather than inventing a meaning.
+   - "meaning" MUST still contain the general documented definitions/senses (separated by semicolons). Do NOT overwrite general meaning with contextual meaning.
    - If no Query Context is provided, "contextual_meaning" MUST be null.
-   - If the Query Context does not provide sufficient clues to distinguish senses or is ambiguous, do NOT invent certainty. State the ambiguity in "uncertainties" and keep "contextual_meaning" null or explain the ambiguity in "contextual_interpretation".
 
 You MUST return valid JSON matching the following SOLResponse JSON schema:
 {
@@ -32,28 +32,47 @@ You MUST return valid JSON matching the following SOLResponse JSON schema:
   "normalized_query": "normalized query string",
   "lemma": "primary root lemma or null if unknown",
   "meaning": "primary definition(s) or null if unsupported. MUST BE WRITTEN IN TAMIL (தமிழ்).",
-  "contextual_meaning": "If the user provided a Query Context sentence, the specific documented lexical sense that best fits the word in that sentence. If no Query Context or if ambiguous, null. MUST BE WRITTEN IN TAMIL (தமிழ்).",
-  "contextual_interpretation": "grounded summary explanation without fabrication. MUST BE WRITTEN IN TAMIL (தமிழ்).",
+  "contextual_meaning": "The exact selected sense determined by deterministic WSD, or null if WSD abstained or no context provided. MUST BE WRITTEN IN TAMIL (தமிழ்).",
+  "contextual_interpretation": "grounded summary explanation synthesizing why the selected sense fits the user context without fabrication. MUST BE WRITTEN IN TAMIL (தமிழ்).",
   "sources": ["ThamizhiMorph", "Sentamizh"],
-  "uncertainties": ["explicit notes on missing data, conflicts, or guesser analyses"],
+  "uncertainties": ["explicit notes on missing data, conflicts, guesser analyses, or contextual ambiguity"],
   "evidence_summary": {"total_found": 0, "morphology_count": 0, "lexical_count": 0, "raw_literary_count": 0, "selected_literary_count": 0, "related_count": 0}
 }
 """
 
 
-def format_evidence_prompt(pack: EvidencePack) -> str:
+def format_evidence_prompt(pack: EvidencePack, wsd_result: Optional[WSDResult] = None) -> str:
     """
     Formats the EvidencePack into structured text sections for LLM input.
+    Injects authoritative deterministic WSD result when context is present.
     """
+    wsd = wsd_result or getattr(pack, "wsd_result", None)
+
     lines = []
     lines.append("=== QUERY ===")
     lines.append(f"Query: {pack.query}")
     lines.append(f"Normalized Query: {pack.normalized_query}")
     if pack.query_context:
         lines.append(f"Query Context (User Sentence): {pack.query_context}")
-        lines.append("Context-Aware Disambiguation Notice: The user highlighted this word within the above sentence. Use this sentence as the primary anchor to disambiguate polysemous senses from the lexical evidence.")
     lines.append(f"Lemma Candidates: {', '.join(pack.lemma_candidates) if pack.lemma_candidates else 'None'}")
     lines.append("")
+
+    if pack.query_context and wsd:
+        lines.append("=== CONTEXTUAL WORD-SENSE DISAMBIGUATION (DETERMINISTIC WSD SELECTION) ===")
+        lines.append(f"WSD Status: {wsd.status}")
+        lines.append(f"WSD Confidence: {wsd.confidence}")
+        lines.append(f"WSD Evidence Strength (Score): {wsd.score:.1f}")
+        selected_text = wsd.selected_sense or "None (Abstained / Insufficient Evidence / Ambiguous)"
+        lines.append(f"Authoritative Selected Sense: {selected_text}")
+        if wsd.reasons:
+            lines.append(f"Selection Reasons: {'; '.join(wsd.reasons)}")
+        if wsd.candidates:
+            lines.append("Evaluated Candidate Senses:")
+            for idx, c_score in enumerate(wsd.candidates, 1):
+                c = c_score.candidate
+                lines.append(f"  [{idx}] Source: {c.source} | Sense: {c.definition} | Score: {c_score.score:.1f}")
+        lines.append("Notice: The deterministic WSD layer has selected the contextual sense. Treat that selection as authoritative. Explain why it fits the supplied context in 'contextual_interpretation'. Do not replace it with another candidate. If WSD abstained, explain the uncertainty rather than inventing a contextual meaning.")
+        lines.append("")
 
     lines.append("=== LEMMA / MORPHOLOGY ===")
     if pack.morphology_evidence:
