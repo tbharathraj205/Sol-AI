@@ -65,5 +65,85 @@ class TestThamizhiMorphAdapter(unittest.TestCase):
         self.assertEqual(ev.metadata.get("normalization_status"), "UNKNOWN")
 
 
+    def test_parse_structured_morphology_noun_locative_plural(self):
+        from backend.resources.thamizhimorph import parse_structured_morphology
+        sm = parse_structured_morphology(
+            query="மரங்களில்",
+            pos="noun",
+            raw_morphology="noun+pl+loc",
+            fst_model="noun.fst",
+            analysis_type="core",
+        )
+        self.assertEqual(sm.pos, "noun")
+        self.assertEqual(sm.case, "Locative")
+        self.assertEqual(sm.number, "Plural")
+        self.assertIsNone(sm.tense)
+        self.assertEqual(sm.fst_model, "noun.fst")
+        self.assertEqual(sm.analysis_type, "core")
+        self.assertEqual(sm.raw_morphology, "noun+pl+loc")
+        self.assertEqual(len(sm.segments), 1)
+        self.assertEqual(sm.segments[0].tamil, "மரங்களில்")
+        self.assertEqual(sm.segments[0].role, "noun + pl + loc")
+
+        # Dict access and compatibility checks
+        self.assertEqual(sm.get("case"), "Locative")
+        self.assertEqual(sm["number"], "Plural")
+        self.assertIn("pos", sm)
+
+    def test_parse_structured_morphology_noun_accusative_singular(self):
+        from backend.resources.thamizhimorph import parse_structured_morphology
+        sm = parse_structured_morphology(
+            query="மரத்தை",
+            pos="noun",
+            raw_morphology="noun+sg+acc",
+            fst_model="noun.fst",
+        )
+        self.assertEqual(sm.pos, "noun")
+        self.assertEqual(sm.case, "Accusative")
+        self.assertEqual(sm.number, "Singular")
+        self.assertIsNone(sm.tense)
+
+    def test_parse_structured_morphology_verb_past_tense(self):
+        from backend.resources.thamizhimorph import parse_structured_morphology
+        sm = parse_structured_morphology(
+            query="வந்தார்கள்",
+            pos="verb",
+            raw_morphology="verb+fin+sim+strong+past=த்+3sghe=ஆர்கள்",
+            fst_model="verb-c12.fst",
+        )
+        self.assertEqual(sm.pos, "verb")
+        self.assertEqual(sm.tense, "Past")
+        self.assertEqual(sm.number, "Singular")
+        self.assertIsNone(sm.case)
+
+    def test_parse_structured_morphology_empty_or_unknown(self):
+        from backend.resources.thamizhimorph import parse_structured_morphology
+        sm = parse_structured_morphology(
+            query="போலி",
+            pos=None,
+            raw_morphology=None,
+            fst_model=None,
+        )
+        self.assertIsNone(sm.pos)
+        self.assertIsNone(sm.case)
+        self.assertIsNone(sm.number)
+        self.assertIsNone(sm.tense)
+        self.assertEqual(sm.analysis_type, "lexical_mapping")
+        self.assertEqual(sm.segments, [])
+
+    def test_parse_structured_morphology_guesser(self):
+        from backend.resources.thamizhimorph import parse_structured_morphology
+        sm = parse_structured_morphology(
+            query="ஏதோ",
+            pos=None,
+            raw_morphology="noun+sg+nom",
+            fst_model="noun-guess.fst",
+        )
+        self.assertEqual(sm.pos, "noun")
+        self.assertEqual(sm.case, "Nominative")
+        self.assertEqual(sm.number, "Singular")
+        self.assertEqual(sm.analysis_type, "guesser")
+
+
 if __name__ == "__main__":
     unittest.main()

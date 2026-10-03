@@ -6,6 +6,124 @@ from typing import List, Optional, Tuple, Dict, Any
 
 from backend.schemas.evidence import Evidence
 from backend.resources.base import ResourceAdapter
+from backend.interpretation.schemas import MorphemeSegment, StructuredMorphology
+
+
+# Grammatical tag mappings for ThamizhiMorph FST analyses
+CASE_MAP = {
+    "nom": "Nominative",
+    "acc": "Accusative",
+    "dat": "Dative",
+    "gen": "Genitive",
+    "loc": "Locative",
+    "soc": "Sociative",
+    "abl": "Ablative",
+    "ins": "Instrumental",
+    "voc": "Vocative",
+}
+
+NUMBER_MAP = {
+    "pl": "Plural",
+    "sg": "Singular",
+}
+
+TENSE_MAP = {
+    "past": "Past",
+    "pres": "Present",
+    "present": "Present",
+    "fut": "Future",
+    "future": "Future",
+}
+
+
+def parse_structured_morphology(
+    query: str,
+    pos: Optional[str] = None,
+    raw_morphology: Optional[Any] = None,
+    fst_model: Optional[str] = None,
+    analysis_type: Optional[str] = None,
+) -> StructuredMorphology:
+    """
+    Parse and normalize raw ThamizhiMorph FST tags into a structured morphology model.
+    Derives POS, Case, Number, Tense, and Morpheme Segments while preserving raw outputs.
+    """
+    case_val: Optional[str] = None
+    number_val: Optional[str] = None
+    tense_val: Optional[str] = None
+
+    # Handle dictionary input
+    if isinstance(raw_morphology, dict):
+        pos = pos or raw_morphology.get("pos")
+        case_val = raw_morphology.get("case")
+        number_val = raw_morphology.get("number")
+        tense_val = raw_morphology.get("tense")
+        fst_model = fst_model or raw_morphology.get("fst_model")
+        analysis_type = analysis_type or raw_morphology.get("analysis_type")
+        raw_str = raw_morphology.get("raw_morphology")
+    elif isinstance(raw_morphology, str):
+        raw_str = raw_morphology.strip()
+    else:
+        raw_str = None
+
+    # Determine analysis_type
+    if not analysis_type:
+        if fst_model:
+            analysis_type = "guesser" if "guess" in str(fst_model).lower() else "core"
+        else:
+            analysis_type = "lexical_mapping"
+
+    # Parse grammatical tags from raw_str (e.g. "noun+pl+loc", "verb+fin+past=த்+3sghe=ஆர்கள்")
+    if raw_str:
+        tokens = [tok.strip() for tok in raw_str.split("+") if tok.strip()]
+        for tok in tokens:
+            tok_lower = tok.lower()
+            base = tok_lower.split("=")[0].strip()
+
+            # Case derivation
+            if not case_val and base in CASE_MAP:
+                case_val = CASE_MAP[base]
+
+            # Number derivation
+            if not number_val:
+                if base in NUMBER_MAP:
+                    number_val = NUMBER_MAP[base]
+                elif "pl" in base:
+                    number_val = "Plural"
+                elif "sg" in base:
+                    number_val = "Singular"
+
+            # Tense derivation
+            if not tense_val and base in TENSE_MAP:
+                tense_val = TENSE_MAP[base]
+
+        # POS derivation from first token if not provided or Unknown
+        if (not pos or pos == "Unknown") and tokens:
+            first_tok = tokens[0].lower().split("=")[0]
+            if first_tok in ("noun", "verb", "adj", "adv", "pronoun", "part"):
+                pos = first_tok
+
+    # Build morpheme segments
+    segments: List[MorphemeSegment] = []
+    if raw_str:
+        role_label = raw_str.replace("+", " + ")
+        segments.append(
+            MorphemeSegment(
+                tamil=query,
+                latin="",
+                role=role_label,
+            )
+        )
+
+    return StructuredMorphology(
+        pos=pos or ("Unknown" if raw_str else None),
+        case=case_val,
+        number=number_val,
+        tense=tense_val,
+        analysis_type=analysis_type,
+        fst_model=fst_model,
+        raw_morphology=raw_str,
+        segments=segments,
+    )
 
 
 class ThamizhiMorphAdapter(ResourceAdapter):

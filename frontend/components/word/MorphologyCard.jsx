@@ -18,23 +18,12 @@ export default function MorphologyCard({ morphology, query = "" }) {
   const rawMorph = morphology.raw_morphology || "";
   const isCore = analysisType === "core";
 
-  // Parse tags from rawMorph (e.g. "noun+pl+nom")
-  const tags = rawMorph.split("+").map(t => t.toLowerCase());
-  
-  const numberMap = { pl: "Plural", sg: "Singular" };
-  const caseMap = { 
-    nom: "Nominative", acc: "Accusative", dat: "Dative", 
-    gen: "Genitive", loc: "Locative", soc: "Sociative", 
-    abl: "Ablative", ins: "Instrumental", voc: "Vocative" 
-  };
-  
-  const parsedNumber = tags.find(t => numberMap[t]) ? numberMap[tags.find(t => numberMap[t])] : "-";
-  const parsedCase = tags.find(t => caseMap[t]) ? caseMap[tags.find(t => caseMap[t])] : "-";
-
-  // If segments aren't provided by backend, build a simple conceptual breakdown
-  const segments = morphology.segments || [
-    { tamil: query, latin: "", role: rawMorph.replace(/\+/g, " + ") }
-  ];
+  // Consume structured Case, Number, and Segments directly from backend
+  const parsedCase = morphology.case || "-";
+  const parsedNumber = morphology.number || "-";
+  const segments = (morphology.segments && morphology.segments.length > 0)
+    ? morphology.segments
+    : (rawMorph ? [{ tamil: query, latin: "", role: rawMorph.replace(/\+/g, " + ") }] : []);
 
   return (
     <div className="h-full flex flex-col bg-[#0A0A0A]/90 border border-white/5 rounded-2xl p-6 shadow-xl backdrop-blur-md space-y-5">

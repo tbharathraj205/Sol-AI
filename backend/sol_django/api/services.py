@@ -229,14 +229,21 @@ class SOLServiceRegistry:
         # 3. Morphology Override
         if pack.morphology_evidence:
             first_morph = pack.morphology_evidence[0]
-            fst_model = first_morph.metadata.get("fst_model", "unknown")
-            analysis_type = first_morph.metadata.get(
-                "analysis_type",
-                "guesser" if "guess" in str(fst_model).lower() else "core",
+            fst_model = (
+                first_morph.metadata.get("fst_model")
+                if hasattr(first_morph, "metadata")
+                else None
             )
-            response.morphology = {
-                "pos": getattr(first_morph, "pos", "Unknown"),
-                "fst_model": fst_model,
-                "analysis_type": analysis_type,
-                "raw_morphology": getattr(first_morph, "morphology", None),
-            }
+            analysis_type = (
+                first_morph.metadata.get("analysis_type")
+                if hasattr(first_morph, "metadata")
+                else None
+            )
+            from backend.resources.thamizhimorph import parse_structured_morphology
+            response.morphology = parse_structured_morphology(
+                query=query,
+                pos=getattr(first_morph, "pos", None) or "Unknown",
+                raw_morphology=getattr(first_morph, "morphology", None),
+                fst_model=fst_model,
+                analysis_type=analysis_type,
+            )

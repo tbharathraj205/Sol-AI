@@ -166,6 +166,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         morphGroup.appendChild(posPill);
       }
 
+      if (morph.case) {
+        const casePill = document.createElement("span");
+        casePill.className = "sol-pill sol-pill-model";
+        casePill.textContent = `Case: ${morph.case}`;
+        morphGroup.appendChild(casePill);
+      }
+
+      if (morph.number) {
+        const numPill = document.createElement("span");
+        numPill.className = "sol-pill sol-pill-model";
+        numPill.textContent = `Number: ${morph.number}`;
+        morphGroup.appendChild(numPill);
+      }
+
       const atype = morph.analysis_type || "core";
       const typePill = document.createElement("span");
       typePill.className = `sol-pill ${atype === "guesser" ? "sol-pill-guesser" : "sol-pill-core"}`;

@@ -326,6 +326,40 @@ function testH_relatedWordsMax3() {
   console.log("  [PASS] Test H: Related words displayed cleanly with maximum 3 items.");
 }
 
+function testI_structuredMorphologyPills() {
+  console.log("Running Test I: Structured morphology pills rendering...");
+  const mockResult = {
+    lemma: "மரம்",
+    senses: [{ sense_number: 1, title: "தாவர வகை", raw_text: "தாவர வகை" }],
+    morphology: {
+      pos: "noun",
+      case: "Locative",
+      number: "Plural",
+      analysis_type: "core",
+      raw_morphology: "noun+pl+loc",
+    },
+    literary_context: [],
+  };
+  dispatchMessage({ action: "SHOW_RESULT", query: "மரங்களில்", result: mockResult });
+  const shadow = content.getShadowRoot();
+  const panel = shadow.querySelector("#sol-ai-panel");
+  const body = panel.children.find((c) => c.className === "sol-body");
+  const tabContents = body.children.filter((c) => c.className && c.className.includes("sol-tab-content"));
+  const morphContent = tabContents[2]; // 3rd tab: Morphology
+  assert.ok(morphContent, "Must render morphology tab content");
+  const mCard = morphContent.children[0];
+  assert.ok(mCard, "Must render morphology card");
+  const morphGroup = mCard.children[1];
+  assert.ok(morphGroup, "Must render morphGroup");
+  const pillsText = morphGroup.children.map((c) => c.textContent);
+  assert.ok(pillsText.includes("POS: noun"), "Must render POS pill");
+  assert.ok(pillsText.includes("CORE"), "Must render analysis type pill");
+  assert.ok(pillsText.includes("Case: Locative"), "Must render Case pill");
+  assert.ok(pillsText.includes("Number: Plural"), "Must render Number pill");
+  assert.ok(pillsText.includes("noun+pl+loc"), "Must render raw morphology string");
+  console.log("  [PASS] Test I: Structured morphology pills rendered cleanly.");
+}
+
 async function runAll() {
   testA_normalResult();
   testB_backendError();
@@ -335,7 +369,8 @@ async function runAll() {
   testF_audioRemovalVerified();
   testG_structuredSensesConsumption();
   testH_relatedWordsMax3();
-  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (8/8)!");
+  testI_structuredMorphologyPills();
+  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (9/9)!");
 }
 
 runAll().catch((err) => {

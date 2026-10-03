@@ -541,6 +541,30 @@ function renderResultPanel(queryText, data) {
       morphGroup.appendChild(typePill);
     }
 
+    if (data.morphology.case) {
+      const casePill = document.createElement("span");
+      casePill.textContent = `Case: ${data.morphology.case}`;
+      casePill.style.padding = "4px 10px";
+      casePill.style.background = "rgba(168, 85, 247, 0.1)";
+      casePill.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+      casePill.style.borderRadius = "12px";
+      casePill.style.fontSize = "12px";
+      casePill.style.color = "#c084fc";
+      morphGroup.appendChild(casePill);
+    }
+
+    if (data.morphology.number) {
+      const numPill = document.createElement("span");
+      numPill.textContent = `Number: ${data.morphology.number}`;
+      numPill.style.padding = "4px 10px";
+      numPill.style.background = "rgba(234, 179, 8, 0.1)";
+      numPill.style.border = "1px solid rgba(234, 179, 8, 0.3)";
+      numPill.style.borderRadius = "12px";
+      numPill.style.fontSize = "12px";
+      numPill.style.color = "#facc15";
+      morphGroup.appendChild(numPill);
+    }
+
     if (data.morphology.raw_morphology) {
       const rawTxt = document.createElement("div");
       rawTxt.textContent = data.morphology.raw_morphology;

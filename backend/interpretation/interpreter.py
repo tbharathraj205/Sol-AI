@@ -93,24 +93,16 @@ class MockLLMInterpreter(BaseLLMInterpreter):
         morph_dict = None
         if pack.morphology_evidence:
             first_morph = pack.morphology_evidence[0]
-            if isinstance(first_morph.morphology, dict):
-                morph_dict = dict(first_morph.morphology)
-            else:
-                morph_dict = {
-                    "pos": first_morph.pos,
-                    "raw_morphology": first_morph.morphology,
-                }
-            
-            fst_model = first_morph.metadata.get("fst_model")
-            analysis_type = first_morph.metadata.get("analysis_type")
-
-            if fst_model:
-                morph_dict["fst_model"] = fst_model
-                morph_dict["analysis_type"] = analysis_type or ("guesser" if "guess" in fst_model.lower() else "core")
-            elif analysis_type:
-                morph_dict["analysis_type"] = analysis_type
-            else:
-                morph_dict["analysis_type"] = "lexical_mapping"
+            fst_model = first_morph.metadata.get("fst_model") if hasattr(first_morph, "metadata") else None
+            analysis_type = first_morph.metadata.get("analysis_type") if hasattr(first_morph, "metadata") else None
+            from backend.resources.thamizhimorph import parse_structured_morphology
+            morph_dict = parse_structured_morphology(
+                query=pack.query,
+                pos=getattr(first_morph, "pos", None),
+                raw_morphology=getattr(first_morph, "morphology", None),
+                fst_model=fst_model,
+                analysis_type=analysis_type,
+            )
 
         # Build literary context items
         lit_items: List[LiteraryContextItem] = []

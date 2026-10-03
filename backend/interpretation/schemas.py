@@ -2,7 +2,7 @@
 Pydantic schemas and dataclasses for the SOL AI Contextual Interpretation Layer.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
 from backend.schemas.evidence import Evidence
 
@@ -27,6 +27,36 @@ class LexicalSenseItem(BaseModel):
     description: Optional[str] = Field(default=None, description="Detailed explanation or gloss if available")
     english_translation: Optional[str] = Field(default=None, description="English translation if available")
     raw_text: Optional[str] = Field(default=None, description="Full raw sense text")
+
+
+class MorphemeSegment(BaseModel):
+    """Represents a single morpheme segment breakdown."""
+
+    tamil: str = Field(description="Tamil surface segment or word")
+    latin: str = Field(default="", description="Transliteration if available")
+    role: str = Field(default="", description="Grammatical role or tag sequence")
+
+
+class StructuredMorphology(BaseModel):
+    """Structured morphology representation produced by backend linguistic parsing."""
+
+    pos: Optional[str] = Field(default=None, description="Part of speech (e.g. noun, verb)")
+    case: Optional[str] = Field(default=None, description="Grammatical case (e.g. Nominative, Locative)")
+    number: Optional[str] = Field(default=None, description="Grammatical number (e.g. Singular, Plural)")
+    tense: Optional[str] = Field(default=None, description="Grammatical tense (e.g. Past, Present, Future)")
+    analysis_type: str = Field(default="core", description="FST analysis type: 'core', 'guesser', or 'lexical_mapping'")
+    fst_model: Optional[str] = Field(default=None, description="Name of the matching FST model file")
+    raw_morphology: Optional[str] = Field(default=None, description="Original raw FST morphology tag sequence")
+    segments: List[MorphemeSegment] = Field(default_factory=list, description="Morpheme breakdown segments")
+
+    def get(self, item: str, default: Any = None) -> Any:
+        return getattr(self, item, default)
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
+
+    def __contains__(self, item: str) -> bool:
+        return hasattr(self, item) and getattr(self, item) is not None
 
 
 def build_lexical_senses(
@@ -100,8 +130,8 @@ class SOLResponse(BaseModel):
     senses: List[LexicalSenseItem] = Field(
         default_factory=list, description="Structured list of distinct lexical senses"
     )
-    morphology: Optional[Dict[str, Any]] = Field(
-        default=None, description="Morphological breakdown (POS, root, suffixes, model type)"
+    morphology: Optional[Union[StructuredMorphology, Dict[str, Any]]] = Field(
+        default=None, description="Structured morphological breakdown (POS, case, number, tense, root, suffixes, model type)"
     )
     contextual_meaning: Optional[str] = Field(
         default=None, description="Precise meaning specifically derived from the query_context, if provided"
