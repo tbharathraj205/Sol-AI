@@ -112,10 +112,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     lemmaCard.appendChild(lemmaHeader);
     lemmaCard.appendChild(lemmaTitle);
 
-    const rawSenses = data.meaning
-      ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
-      : [];
-    const senses = rawSenses.slice(0, 2);
+    let senses = [];
+    if (data.senses && Array.isArray(data.senses) && data.senses.length > 0) {
+      senses = data.senses.slice(0, 2).map((s) => s.raw_text || s.title);
+    } else if (data.meaning) {
+      senses = data.meaning
+        .split(";")
+        .map((s) => s.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .slice(0, 2);
+    }
 
     if (senses.length > 1) {
       const meanList = document.createElement("ul");
@@ -240,7 +246,41 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 
-    // 5. Sources
+    // 5. Related Words
+    const relWords = (data.related_words || []).slice(0, 3);
+    if (relWords.length > 0) {
+      const relCard = document.createElement("div");
+      relCard.className = "sol-card";
+
+      const relHeader = document.createElement("div");
+      relHeader.className = "sol-section-header";
+      relHeader.textContent = "Related Words";
+
+      const relTags = document.createElement("div");
+      relTags.className = "sol-source-tags";
+
+      relWords.forEach((word) => {
+        const chip = document.createElement("span");
+        chip.className = "sol-source-chip";
+        chip.style.borderColor = "rgba(201, 162, 39, 0.4)";
+        chip.style.color = "var(--sol-gold)";
+        chip.style.cursor = "pointer";
+        chip.textContent = word;
+        chip.onclick = () => {
+          if (queryInput) {
+            queryInput.value = word;
+            performLookup();
+          }
+        };
+        relTags.appendChild(chip);
+      });
+
+      relCard.appendChild(relHeader);
+      relCard.appendChild(relTags);
+      popupView.appendChild(relCard);
+    }
+
+    // 6. Sources
     const sources = data.sources || [];
     const srcCard = document.createElement("div");
     srcCard.className = "sol-card";

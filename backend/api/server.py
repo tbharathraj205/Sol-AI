@@ -199,6 +199,13 @@ class SOLAPIRequestHandler(BaseHTTPRequestHandler):
                         "raw_morphology": getattr(first_morph, "morphology", None)
                     }
 
+                # 4. Senses synchronization
+                if not getattr(response, "senses", None) and response.meaning:
+                    from backend.interpretation.schemas import parse_senses_from_meaning_string
+                    response.senses = parse_senses_from_meaning_string(
+                        response.meaning, response.english_meaning
+                    )
+
                 self._send_json(200, response.model_dump())
             except ValueError as val_err:
                 # Configuration error (e.g. GEMINI_API_KEY missing)

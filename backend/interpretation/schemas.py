@@ -19,6 +19,73 @@ class LiteraryContextItem(BaseModel):
     source: str = Field(default="Sentamizh", description="Source corpus name")
 
 
+class LexicalSenseItem(BaseModel):
+    """Represents a single structured lexical sense/meaning."""
+
+    sense_number: int = Field(description="1-based index of the sense")
+    title: str = Field(description="Title or short summary of the sense")
+    description: Optional[str] = Field(default=None, description="Detailed explanation or gloss if available")
+    english_translation: Optional[str] = Field(default=None, description="English translation if available")
+    raw_text: Optional[str] = Field(default=None, description="Full raw sense text")
+
+
+def build_lexical_senses(
+    meanings: List[str],
+    english_meanings: Optional[List[str]] = None,
+) -> List[LexicalSenseItem]:
+    """
+    Build structured LexicalSenseItem objects from distinct lexical meaning strings.
+    Extracts title and description if separated by standard punctuation ('—', '-', ':').
+    """
+    import re
+    senses: List[LexicalSenseItem] = []
+    for idx, raw_sense in enumerate(meanings):
+        clean_text = raw_sense.strip()
+        if not clean_text:
+            continue
+
+        parts = re.split(r"\s*[—\-:]\s*", clean_text, maxsplit=1)
+        if len(parts) > 1 and parts[1]:
+            title = parts[0].strip()
+            desc = parts[1].strip()
+        else:
+            title = clean_text
+            desc = None
+
+        eng_trans = None
+        if english_meanings and idx < len(english_meanings) and english_meanings[idx]:
+            eng_trans = english_meanings[idx].strip() or None
+
+        senses.append(
+            LexicalSenseItem(
+                sense_number=idx + 1,
+                title=title,
+                description=desc,
+                english_translation=eng_trans,
+                raw_text=clean_text,
+            )
+        )
+    return senses
+
+
+def parse_senses_from_meaning_string(
+    meaning_str: Optional[str],
+    english_meaning_str: Optional[str] = None,
+) -> List[LexicalSenseItem]:
+    """
+    Parse a semicolon-separated meaning string into structured LexicalSenseItem instances.
+    """
+    if not meaning_str:
+        return []
+    raw_senses = [s.strip() for s in meaning_str.split(";") if s.strip()]
+    eng_senses = (
+        [s.strip() for s in english_meaning_str.split(";")]
+        if english_meaning_str
+        else None
+    )
+    return build_lexical_senses(raw_senses, eng_senses)
+
+
 class SOLResponse(BaseModel):
     """
     Structured response schema for SOL AI interpretation layer.
@@ -30,6 +97,9 @@ class SOLResponse(BaseModel):
     lemma: Optional[str] = Field(default=None, description="Primary root/lemma determined from evidence")
     meaning: Optional[str] = Field(default=None, description="Primary meaning(s) supported by dictionary evidence")
     english_meaning: Optional[str] = Field(default=None, description="English translation of the meaning")
+    senses: List[LexicalSenseItem] = Field(
+        default_factory=list, description="Structured list of distinct lexical senses"
+    )
     morphology: Optional[Dict[str, Any]] = Field(
         default=None, description="Morphological breakdown (POS, root, suffixes, model type)"
     )

@@ -15,6 +15,8 @@ from backend.interpretation.schemas import (
     EvidencePack,
     SOLResponse,
     LiteraryContextItem,
+    LexicalSenseItem,
+    build_lexical_senses,
 )
 from backend.interpretation.prompts import SYSTEM_PROMPT, format_evidence_prompt
 
@@ -72,10 +74,10 @@ class MockLLMInterpreter(BaseLLMInterpreter):
         meaning_str = "; ".join(meanings) if meanings else None
         
         english_meaning_str = None
+        eng_meanings = []
         if meanings and OfflineTranslator is not None:
             try:
                 translator = OfflineTranslator.get_instance()
-                eng_meanings = []
                 for m in meanings:
                     # Max length truncation per meaning
                     text_to_translate = m[:400]
@@ -84,6 +86,8 @@ class MockLLMInterpreter(BaseLLMInterpreter):
                 english_meaning_str = "; ".join(eng_meanings)
             except Exception as e:
                 print(f"[Offline Translation Error] {e}")
+
+        senses_list = build_lexical_senses(meanings, eng_meanings if eng_meanings else None)
 
         # Determine morphology
         morph_dict = None
@@ -214,6 +218,7 @@ class MockLLMInterpreter(BaseLLMInterpreter):
             lemma=lemma,
             meaning=meaning_str,
             english_meaning=english_meaning_str,
+            senses=senses_list,
             morphology=morph_dict,
             contextual_meaning=contextual_meaning_mock,
             contextual_interpretation=interpretation,

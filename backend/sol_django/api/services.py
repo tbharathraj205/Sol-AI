@@ -23,6 +23,8 @@ from backend.interpretation.schemas import (
     EvidencePack,
     SOLResponse,
     LiteraryContextItem,
+    LexicalSenseItem,
+    parse_senses_from_meaning_string,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,6 +157,14 @@ class SOLServiceRegistry:
                     meanings.append(ev.meaning)
             if meanings:
                 response.meaning = "; ".join(meanings)
+
+        # Ensure structured senses are always populated and synchronized
+        if not response.senses and response.meaning:
+            response.senses = parse_senses_from_meaning_string(
+                response.meaning, response.english_meaning
+            )
+        elif response.senses and not response.meaning:
+            response.meaning = "; ".join(s.raw_text or s.title for s in response.senses)
 
         # 2. Contextual Meaning Override / Deterministic Disambiguation
         if pack.query_context and pack.query_context.strip():

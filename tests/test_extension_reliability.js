@@ -249,13 +249,93 @@ function testE_multipleMeaningsBullets() {
   console.log("  [PASS] Test E: Multiple meanings rendered cleanly as bullet items.");
 }
 
+// -----------------------------------------------------------------------------
+// Test F: Audio button removal verified
+// -----------------------------------------------------------------------------
+function testF_audioRemovalVerified() {
+  console.log("Running Test F: Audio removal...");
+  const mockResult = {
+    lemma: "கால்",
+    meaning: "உறுப்பு",
+    morphology: { pos: "noun" },
+    literary_context: [],
+  };
+  dispatchMessage({ action: "SHOW_RESULT", query: "கால்", result: mockResult });
+  const shadow = content.getShadowRoot();
+  const heroTop = shadow.querySelector(".sol-hero-top");
+  assert.ok(heroTop, "Must render heroTop");
+  const audioButtons = heroTop.children.filter((c) => c.innerHTML && c.innerHTML.includes("<polygon"));
+  assert.strictEqual(audioButtons.length, 0, "Hero top must contain zero audio buttons/icons");
+  console.log("  [PASS] Test F: Audio button cleanly removed from Extension.");
+}
+
+// -----------------------------------------------------------------------------
+// Test G: Structured senses direct consumption
+// -----------------------------------------------------------------------------
+function testG_structuredSensesConsumption() {
+  console.log("Running Test G: Structured senses...");
+  const mockResult = {
+    lemma: "கால்",
+    senses: [
+      { sense_number: 1, title: "உடல் உறுப்பு", raw_text: "உடல் உறுப்பு" },
+      { sense_number: 2, title: "நான்கில் ஒரு பங்கு", raw_text: "நான்கில் ஒரு பங்கு" },
+      { sense_number: 3, title: "காற்று", raw_text: "காற்று" },
+    ],
+    morphology: { pos: "noun" },
+    literary_context: [],
+  };
+  dispatchMessage({ action: "SHOW_RESULT", query: "கால்", result: mockResult });
+  const shadow = content.getShadowRoot();
+  const bulletsList = shadow.querySelector(".sol-meaning-bullets");
+  assert.ok(bulletsList, "Must render .sol-meaning-bullets list for structured senses");
+  assert.strictEqual(bulletsList.children.length, 2, "Must preserve exactly 2 senses");
+  assert.strictEqual(bulletsList.children[0].textContent, "உடல் உறுப்பு");
+  assert.strictEqual(bulletsList.children[1].textContent, "நான்கில் ஒரு பங்கு");
+  console.log("  [PASS] Test G: Structured senses consumed directly with 2 senses preserved.");
+}
+
+// -----------------------------------------------------------------------------
+// Test H: Related words rendering max 3
+// -----------------------------------------------------------------------------
+function testH_relatedWordsMax3() {
+  console.log("Running Test H: Related words max 3...");
+  const mockResult = {
+    lemma: "மரம்",
+    senses: [{ sense_number: 1, title: "தாவர வகை", raw_text: "தாவர வகை" }],
+    related_words: ["செடி", "கொடி", "தரு", "மரம்2", "மரங்கள்"],
+    morphology: { pos: "noun" },
+    literary_context: [],
+  };
+  dispatchMessage({ action: "SHOW_RESULT", query: "மரம்", result: mockResult });
+  const shadow = content.getShadowRoot();
+  const panel = shadow.querySelector("#sol-ai-panel");
+  assert.ok(panel, "Must render panel");
+  const body = panel.children.find((c) => c.className === "sol-body");
+  assert.ok(body, "Must render body");
+  const meanContent = body.children.find((c) => c.className && c.className.includes("sol-tab-content"));
+  assert.ok(meanContent, "Must render meanContent");
+  const relCard = meanContent.children.find((c) => {
+    return c.children && c.children[0] && c.children[0].innerHTML && c.children[0].innerHTML.includes("Related Words");
+  });
+  assert.ok(relCard, "Must render Related Words card when related_words exist");
+  const chipsGroup = relCard.children[1];
+  assert.strictEqual(chipsGroup.children.length, 3, "Must display at most 3 related words");
+  assert.strictEqual(chipsGroup.children[0].textContent, "செடி");
+  assert.strictEqual(chipsGroup.children[1].textContent, "கொடி");
+  assert.strictEqual(chipsGroup.children[2].textContent, "தரு");
+  console.log("  [PASS] Test H: Related words displayed cleanly with maximum 3 items.");
+}
+
 async function runAll() {
   testA_normalResult();
   testB_backendError();
   await testC_watchdogTimeout();
   testD_newQueryCancelsOldWatchdog();
   testE_multipleMeaningsBullets();
-  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (5/5)!");
+  testF_audioRemovalVerified();
+  testG_structuredSensesConsumption();
+  testH_relatedWordsMax3();
+  console.log("\nALL EXTENSION RELIABILITY TESTS PASSED (8/8)!");
 }
 
 runAll().catch((err) => {

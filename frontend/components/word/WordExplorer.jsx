@@ -59,6 +59,7 @@ export default function WordExplorer({ data, onBack = null }) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 <div>
                   <MeaningCard
+                    senses={data.senses}
                     meaning={data.meaning}
                     englishMeaning={data.english_meaning}
                     query={data.query}
@@ -95,7 +96,7 @@ export default function WordExplorer({ data, onBack = null }) {
 
         {activeTab === "meanings" && (
           <div className="max-w-4xl mx-auto space-y-6">
-            <MeaningCard meaning={data.meaning} query={data.query} />
+            <MeaningCard senses={data.senses} meaning={data.meaning} query={data.query} />
             {data.contextual_interpretation && (
               <InterpretationCard interpretation={data.contextual_interpretation} />
             )}

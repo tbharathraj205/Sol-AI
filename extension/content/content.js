@@ -9,7 +9,6 @@ const ICONS = {
   document: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   leaf: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`,
   bulb: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.9 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
-  volume: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
   heart: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>`,
   git: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="13" cy="6" r="3"/><line x1="6" y1="9" x2="6" y2="21"/><path d="M13 9a9 9 0 0 1 5 8"/></svg>`,
   list: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
@@ -343,13 +342,8 @@ function renderResultPanel(queryText, data) {
   wordTitle.className = "sol-word-title";
   wordTitle.textContent = data.lemma || queryText;
   
-  const audioBtn = document.createElement("button");
-  audioBtn.className = "sol-icon-btn";
-  audioBtn.innerHTML = ICONS.volume;
-  
   wordGroup.appendChild(wordTitle);
   heroTop.appendChild(wordGroup);
-  heroTop.appendChild(audioBtn);
   
   const trans = document.createElement("div");
   trans.className = "sol-transliteration";
@@ -431,10 +425,12 @@ function renderResultPanel(queryText, data) {
   const meanCard = document.createElement("div");
   meanCard.className = "sol-meaning-card";
 
-  const rawSenses = data.meaning
-    ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
-    : [];
-  const senses = rawSenses.slice(0, 2);
+  let senses = [];
+  if (data.senses && Array.isArray(data.senses) && data.senses.length > 0) {
+    senses = data.senses.slice(0, 2).map(s => s.raw_text || s.title);
+  } else if (data.meaning) {
+    senses = data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 2);
+  }
 
   const meanHeader = document.createElement("div");
   meanHeader.className = "sol-card-header";
@@ -464,6 +460,47 @@ function renderResultPanel(queryText, data) {
   }
   
   meanContent.appendChild(meanCard);
+
+  // 3. Related Words Card (max 3)
+  const relWords = (data.related_words || []).slice(0, 3);
+  if (relWords.length > 0) {
+    const relCard = document.createElement("div");
+    relCard.className = "sol-meaning-card";
+
+    const relHeader = document.createElement("div");
+    relHeader.className = "sol-card-header";
+    relHeader.innerHTML = `${ICONS.git} Related Words`;
+    relCard.appendChild(relHeader);
+
+    const relGroup = document.createElement("div");
+    relGroup.style.display = "flex";
+    relGroup.style.flexWrap = "wrap";
+    relGroup.style.gap = "8px";
+    relGroup.style.marginTop = "10px";
+
+    relWords.forEach(word => {
+      const chip = document.createElement("button");
+      chip.textContent = word;
+      chip.className = "sol-badge";
+      chip.style.cursor = "pointer";
+      chip.style.borderColor = "rgba(201, 162, 39, 0.4)";
+      chip.style.color = "var(--sol-gold)";
+      chip.onclick = () => {
+        renderLoadingPanel(word);
+        chrome.runtime.sendMessage({ action: "QUERY_API", query: word }, (response) => {
+          if (chrome.runtime.lastError || !response || response.status === "error") {
+            renderErrorPanel(word, response?.error || "Error", true);
+          } else {
+            renderResultPanel(word, response.data);
+          }
+        });
+      };
+      relGroup.appendChild(chip);
+    });
+
+    relCard.appendChild(relGroup);
+    meanContent.appendChild(relCard);
+  }
   
   // Build Morph Content
   const mCard = document.createElement("div");
