@@ -327,7 +327,7 @@ If you use or reference **SOL AI** or its underlying Tamil lexical retrieval arc
 ```bibtex
 @article{solai2026,
   title={SOL AI: A Grounded Tamil Lexical Intelligence System via Finite-State Morphology, Classical Literary Corpus Retrieval, and Deterministic Word-Sense Disambiguation},
-  author={Vel, Vishwa and Thevar, Suresh and Team},
+  author={Sivakumar, Vishwavel and Thevar, Suresh and Raj, Bharath},
   year={2026}
 }
 ```
@@ -336,8 +336,9 @@ If you use or reference **SOL AI** or its underlying Tamil lexical retrieval arc
 
 ## 👥 Contributors
 
-* **Vishwa Vel** — Core Architecture, Linguistic Pipelines & Models
-* **Suresh Thevar** — Systems Architecture, API Engineering & Full-Stack Integration
+* **Vishwavel Sivakumar** - [@vishwavel05](https://github.com/vishwavel05)
+* **Suresh Thevar** - [@sureshthevar05](https://github.com/sureshthevar05)
+* **Bharath Raj T** - [@tbharathraj205](https://github.com/tbharathraj205)
 
 ---
 
