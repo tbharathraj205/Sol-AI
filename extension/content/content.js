@@ -405,33 +405,48 @@ function renderResultPanel(queryText, data) {
   const [meanContent, litContent, morphContent] = tabContents;
 
   // Build Meaning Content
-  const meanCard = document.createElement("div");
-  meanCard.className = "sol-meaning-card";
-  
+  // 1. Separate Contextual WSD Card (Situational / In this context)
   if (data.contextual_meaning) {
+    const contextCard = document.createElement("div");
+    contextCard.className = "sol-meaning-card";
+    contextCard.style.borderLeft = "3px solid #C9A227";
+
     const contextHeader = document.createElement("div");
     contextHeader.className = "sol-card-header";
     contextHeader.style.color = "#C9A227"; // Highlight context color
     contextHeader.innerHTML = `${ICONS.bulb} In this context (இச்சூழலில்)`;
-    meanCard.appendChild(contextHeader);
+    contextCard.appendChild(contextHeader);
     
     const contextText = document.createElement("div");
     contextText.className = "sol-meaning-summary";
     contextText.style.fontWeight = "bold";
-    contextText.style.marginBottom = "16px";
+    contextText.style.marginBottom = "0";
     contextText.textContent = data.contextual_meaning;
-    meanCard.appendChild(contextText);
+    contextCard.appendChild(contextText);
+
+    meanContent.appendChild(contextCard);
   }
+
+  // 2. General Meaning Card (Preserved Senses)
+  const meanCard = document.createElement("div");
+  meanCard.className = "sol-meaning-card";
+
+  const rawSenses = data.meaning
+    ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+    : [];
+  const senses = rawSenses.slice(0, 2);
 
   const meanHeader = document.createElement("div");
   meanHeader.className = "sol-card-header";
-  meanHeader.innerHTML = `${ICONS.book} General Meaning`;
+  meanHeader.style.display = "flex";
+  meanHeader.style.justifyContent = "space-between";
+  meanHeader.style.alignItems = "center";
+  meanHeader.innerHTML = `
+    <span style="display:flex;align-items:center;gap:8px;">${ICONS.book} General Meaning</span>
+    <span style="font-size:11px;color:#94a3b8;font-weight:500;">${senses.length} Senses Preserved</span>
+  `;
   meanCard.appendChild(meanHeader);
   
-  const senses = data.meaning
-    ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
-    : [];
-
   if (senses.length > 1) {
     const meanList = document.createElement("ul");
     meanList.className = "sol-meaning-bullets";

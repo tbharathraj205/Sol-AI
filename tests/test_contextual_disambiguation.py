@@ -266,6 +266,89 @@ class TestContextualDisambiguation(unittest.TestCase):
         self.assertIn(self.CONTEXT_PHYSICAL, resp_phys.contextual_interpretation)
         self.assertIn(self.CONTEXT_REAL_DEMO_KILO, resp_kilo.contextual_interpretation)
 
+    def test_10_general_meaning_matches_web_app_and_is_context_independent(self):
+        """
+        TEST 10 — REGRESSION TEST:
+        General Meaning matches the web app's existing meaning representation:
+        - Web app consumes `data.meaning.split(';').map(s => s.trim()).filter(Boolean)`
+        - Web app preserves the top 2 senses (displayed as '2 Senses Preserved' for 'கால்'):
+          Sense 1: 'மாந்தர்கள் உட்பட விலங்குகளின் ஓர் உடல் உறுப்பு. இது தரையில் ஊன்றி நடக்கவோ, நகரவோ பயன்படுவது.'
+          Sense 2: 'ஒன்றை ஈடாகப் பங்கிட்ட நான்கில் ஒரு பங்கு (அரையில் பாதி)' (with \frac{1}{4})
+        - General Meaning is 100% stable and context-independent across all sentences:
+          changing the sentence does NOT alter General Meaning.
+        """
+        context_a = "அவள் கால் கிலோ சர்க்கரை வாங்கினாள்."
+        context_b = "அவனுடைய கால் வலிக்கிறது."
+        context_c = "நாற்காலியின் கால் உடைந்தது."
+
+        resp_a = self.service.process_query(query="கால்", provider="mock", context=context_a)
+        resp_b = self.service.process_query(query="கால்", provider="mock", context=context_b)
+        resp_c = self.service.process_query(query="கால்", provider="mock", context=context_c)
+        resp_none = self.service.process_query(query="கால்", provider="mock", context=None)
+
+        for label, resp in [("Context A", resp_a), ("Context B", resp_b), ("Context C", resp_c), ("No Context", resp_none)]:
+            self.assertIsNotNone(resp.meaning, f"{label} returned empty meaning")
+            raw_senses = [s.strip() for s in resp.meaning.split(";") if s.strip()]
+            preserved_senses = raw_senses[:2]  # Web app MeaningCard.jsx slice(0, 2)
+            self.assertEqual(
+                len(preserved_senses),
+                2,
+                f"Expected exactly 2 preserved senses for 'கால்' matching web app, got: {len(preserved_senses)}"
+            )
+            # Sense 1: Physical foot/leg definition
+            self.assertIn("உடல் உறுப்பு", preserved_senses[0])
+            self.assertIn("நடக்கவோ", preserved_senses[0])
+            # Sense 2: Quarter / fractional definition
+            self.assertIn("நான்கில் ஒரு பங்கு", preserved_senses[1])
+
+        # Identity across all contexts: changing sentence does not alter General Meaning
+        self.assertEqual(resp_a.meaning, resp_b.meaning)
+        self.assertEqual(resp_b.meaning, resp_c.meaning)
+        self.assertEqual(resp_c.meaning, resp_none.meaning)
+
+    def test_11_three_distinct_contexts_disambiguate_accurately(self):
+        """
+        TEST 11 — ACCURATE CONTEXTUAL DISAMBIGUATION ACROSS THREE CONTEXTS:
+        - Context A ('அவள் கால் கிலோ சர்க்கரை வாங்கினாள்.') -> நான்கில் ஒரு பங்கு / 1/4
+        - Context B ('அவனுடைய கால் வலிக்கிறது.') -> உடல் உறுப்பு / பாதம்
+        - Context C ('நாற்காலியின் கால் உடைந்தது.') -> நாற்காலியைத் தாங்கும் பகுதி
+        """
+        context_a = "அவள் கால் கிலோ சர்க்கரை வாங்கினாள்."
+        context_b = "அவனுடைய கால் வலிக்கிறது."
+        context_c = "நாற்காலியின் கால் உடைந்தது."
+
+        resp_a = self.service.process_query(query="கால்", provider="mock", context=context_a)
+        resp_b = self.service.process_query(query="கால்", provider="mock", context=context_b)
+        resp_c = self.service.process_query(query="கால்", provider="mock", context=context_c)
+
+        # All three must produce non-None contextual meaning
+        self.assertIsNotNone(resp_a.contextual_meaning)
+        self.assertIsNotNone(resp_b.contextual_meaning)
+        self.assertIsNotNone(resp_c.contextual_meaning)
+
+        # Context A: fractional / quarter
+        self.assertIn("நான்கில் ஒரு பங்கு", resp_a.contextual_meaning)
+        self.assertNotIn("உடல் உறுப்பு", resp_a.contextual_meaning)
+
+        # Context B: somatic / physical body organ
+        self.assertTrue(
+            "உடல் உறுப்பு" in resp_b.contextual_meaning or "பாதம்" in resp_b.contextual_meaning,
+            f"Expected anatomical sense for Context B, got: {resp_b.contextual_meaning}"
+        )
+        self.assertNotIn("நான்கில் ஒரு பங்கு", resp_b.contextual_meaning)
+
+        # Context C: furniture / structural support
+        self.assertTrue(
+            "நாற்காலி" in resp_c.contextual_meaning or "தாங்கும் பகுதி" in resp_c.contextual_meaning,
+            f"Expected furniture sense for Context C, got: {resp_c.contextual_meaning}"
+        )
+        self.assertNotIn("நான்கில் ஒரு பங்கு", resp_c.contextual_meaning)
+
+        # All three contextual meanings must be mutually distinct
+        self.assertNotEqual(resp_a.contextual_meaning, resp_b.contextual_meaning)
+        self.assertNotEqual(resp_b.contextual_meaning, resp_c.contextual_meaning)
+        self.assertNotEqual(resp_a.contextual_meaning, resp_c.contextual_meaning)
+
 
 if __name__ == "__main__":
     unittest.main()

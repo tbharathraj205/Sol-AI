@@ -147,7 +147,35 @@ class SOLServiceRegistry:
         Inject deterministic structural evidence from EvidencePack into SOLResponse
         to override any omissions or formatting defects from LLM output.
         """
-        # 1. Related Words Override
+        # 1. General Meaning: ensure stable lexical meaning inventory from lexical evidence if omitted
+        if not response.meaning and pack.lexical_evidence:
+            meanings = []
+            for ev in pack.lexical_evidence:
+                if ev.meaning and ev.meaning not in meanings:
+                    meanings.append(ev.meaning)
+            if meanings:
+                response.meaning = "; ".join(meanings)
+
+        # 2. Contextual Meaning Override / Deterministic Disambiguation
+        if pack.query_context and pack.query_context.strip():
+            candidate_senses = [ev.meaning for ev in pack.lexical_evidence if ev.meaning]
+            if candidate_senses:
+                from backend.interpretation.wsd import TamilWSD
+                wsd = TamilWSD()
+                sel_sense, score, _ = wsd.disambiguate(
+                    query=query,
+                    context_sentence=pack.query_context,
+                    candidate_senses=candidate_senses,
+                )
+                response.contextual_meaning = sel_sense
+                if sel_sense is None and not any("ambiguity" in u.lower() or "context" in u.lower() for u in response.uncertainties):
+                    response.uncertainties.append(
+                        "Contextual sense ambiguity: The provided context does not establish sufficient discriminative evidence to select a unique lexical sense."
+                    )
+        else:
+            response.contextual_meaning = None
+
+        # 3. Related Words Override
         rel_words: List[str] = []
         for ev in pack.related_evidence:
             if hasattr(ev, "relations") and ev.relations:

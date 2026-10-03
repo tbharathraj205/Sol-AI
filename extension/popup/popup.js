@@ -112,9 +112,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     lemmaCard.appendChild(lemmaHeader);
     lemmaCard.appendChild(lemmaTitle);
 
-    const senses = data.meaning
+    const rawSenses = data.meaning
       ? data.meaning.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
       : [];
+    const senses = rawSenses.slice(0, 2);
 
     if (senses.length > 1) {
       const meanList = document.createElement("ul");

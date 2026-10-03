@@ -96,6 +96,37 @@ FRACTION_INDICATORS: Set[str] = {
     "நாலினொன்று", "பங்கிட்ட", "எண்", "கீழ்வாய்", "பின்னம்", "பின்ன", "கூறு"
 }
 
+# Somatic / physiological / bodily condition, sensation, and action terms collocated with anatomical senses
+SOMATIC_BODY_TERMS: Set[str] = {
+    # Pain, injury, sensations
+    "வலி", "வலிக்கிறது", "வலிக்கும்", "வலித்தது", "நோவு", "நோகிறது", "காயம்",
+    "வீக்கம்", "முறிவு", "முறிந்தது", "சுளுக்கு", "சுளுக்கியது", "தேய்மானம்",
+    "நொண்டி", "நொண்டுகிறான்", "நொண்டுகிறாள்", "நலிவு", "புண்", "ரத்தம்", "இரத்தம்",
+    # Physical movements / postures
+    "நட", "நடக்க", "நடக்கும்போது", "நடத்தல்", "நடந்தான்", "நடந்தாள்",
+    "ஓடு", "ஓட", "ஓடும்போது", "குதி", "குதித்தல்", "தாவு", "மிதி", "மிதித்தல்",
+    "வழுக்கு", "வழுக்கி", "வழுக்கியது", "ஊன்று", "ஊன்றி", "மடக்கு", "நீட்டு",
+    # Anatomy / physiological context
+    "உடல்", "உறுப்பு", "பாதம்", "கை", "விரல்", "தசை", "எலும்பு", "மூட்டு",
+    "தோல்", "சதை", "மருத்துவர்", "சிகிச்சை", "மருந்து"
+}
+
+# Anatomical / body organ semantic indicators in definitions
+ANATOMICAL_INDICATORS: Set[str] = {
+    "உடல் உறுப்பு", "உறுப்பு", "பாதம்", "விலங்கு", "மாந்தர்", "மனிதர்", "தசை", "எலும்பு", "மூட்டு"
+}
+
+# Furniture / structural support terms collocated with furniture support senses
+FURNITURE_STRUCTURE_TERMS: Set[str] = {
+    "நாற்காலி", "முக்காலி", "மேஜை", "மேசை", "கட்டில்", "பீடம்", "இருக்கை",
+    "கருவி", "தூண்", "மஞ்சம்", "பலகை"
+}
+
+# Furniture / structural support semantic indicators in definitions
+FURNITURE_INDICATORS: Set[str] = {
+    "நாற்காலி", "முக்காலி", "இருக்கை", "தாங்கி", "தாங்கும் பகுதி", "தாங்கி நிற்கும் பகுதி", "தாங்கி நிற்கும்"
+}
+
 
 def format_fraction_unit_gloss(query: str, unit: str, top_sense: str) -> str:
     """
@@ -265,6 +296,32 @@ class TamilWSD:
         closest_unit_raw = closest_unit[1] if closest_unit else None
         closest_unit_name = closest_unit[2] if closest_unit else None
 
+        # Detect somatic / physiological bodily terms in context
+        detected_somatic: List[Tuple[int, str, str]] = []
+        for w, d in token_distances.items():
+            w_stem = tamil_stem(w)
+            if w in SOMATIC_BODY_TERMS:
+                detected_somatic.append((d, w, w))
+            elif w_stem in SOMATIC_BODY_TERMS:
+                detected_somatic.append((d, w, w_stem))
+
+        detected_somatic.sort(key=lambda x: x[0])
+        closest_somatic = detected_somatic[0] if detected_somatic else None
+        closest_somatic_dist = closest_somatic[0] if closest_somatic else 999
+
+        # Detect furniture / structural support terms in context
+        detected_furniture: List[Tuple[int, str, str]] = []
+        for w, d in token_distances.items():
+            w_stem = tamil_stem(w)
+            if w in FURNITURE_STRUCTURE_TERMS:
+                detected_furniture.append((d, w, w))
+            elif w_stem in FURNITURE_STRUCTURE_TERMS:
+                detected_furniture.append((d, w, w_stem))
+
+        detected_furniture.sort(key=lambda x: x[0])
+        closest_furniture = detected_furniture[0] if detected_furniture else None
+        closest_furniture_dist = closest_furniture[0] if closest_furniture else 999
+
         # Deduplicate candidate senses preserving order
         unique_senses = list(dict.fromkeys(s for s in candidate_senses if s and s.strip()))
         if not unique_senses:
@@ -336,6 +393,50 @@ class TamilWSD:
                     score += unit_boost
                     reasons.append(f"distant_unit:{raw_u}(dist={d})->fraction_sense(+{unit_boost:.1f})")
 
+            # Check if this sense represents an anatomical body part
+            s_has_anatomy = bool(
+                (s_toks & ANATOMICAL_INDICATORS) or
+                (s_stm & ANATOMICAL_INDICATORS) or
+                any(ind in s_text for ind in ANATOMICAL_INDICATORS)
+            )
+
+            if s_has_anatomy and closest_somatic:
+                d, raw_s, s_name = closest_somatic
+                if d == 1:
+                    somatic_boost = 35.0
+                    score += somatic_boost
+                    reasons.append(f"adjacent_somatic:{raw_s}(dist=1)->anatomy_sense(+{somatic_boost:.1f})")
+                elif d <= 3:
+                    somatic_boost = 20.0 / d
+                    score += somatic_boost
+                    reasons.append(f"collocated_somatic:{raw_s}(dist={d})->anatomy_sense(+{somatic_boost:.1f})")
+                else:
+                    somatic_boost = 5.0 / d
+                    score += somatic_boost
+                    reasons.append(f"distant_somatic:{raw_s}(dist={d})->anatomy_sense(+{somatic_boost:.1f})")
+
+            # Check if this sense represents furniture / structural support
+            s_has_furniture = bool(
+                (s_toks & FURNITURE_INDICATORS) or
+                (s_stm & FURNITURE_INDICATORS) or
+                any(ind in s_text for ind in FURNITURE_INDICATORS)
+            )
+
+            if s_has_furniture and closest_furniture:
+                d, raw_f, f_name = closest_furniture
+                if d == 1:
+                    furn_boost = 35.0
+                    score += furn_boost
+                    reasons.append(f"adjacent_furniture:{raw_f}(dist=1)->furniture_sense(+{furn_boost:.1f})")
+                elif d <= 3:
+                    furn_boost = 20.0 / d
+                    score += furn_boost
+                    reasons.append(f"collocated_furniture:{raw_f}(dist={d})->furniture_sense(+{furn_boost:.1f})")
+                else:
+                    furn_boost = 5.0 / d
+                    score += furn_boost
+                    reasons.append(f"distant_furniture:{raw_f}(dist={d})->furniture_sense(+{furn_boost:.1f})")
+
             for c in c_tokens:
                 c_stm = tamil_stem(c)
                 d = token_distances.get(c, 999)
@@ -403,5 +504,27 @@ class TamilWSD:
         if win_has_fraction and closest_unit and closest_unit_dist <= 2:
             formatted_sense = format_fraction_unit_gloss(query, closest_unit_name, top_sense)
             return formatted_sense, top_score, top_reasons
+
+        # Check if winning sense represents anatomical body part collocated with somatic terms
+        win_has_anatomy = bool(
+            (top_toks & ANATOMICAL_INDICATORS) or
+            (top_stm & ANATOMICAL_INDICATORS) or
+            any(ind in top_sense for ind in ANATOMICAL_INDICATORS)
+        )
+        if win_has_anatomy and closest_somatic and closest_somatic_dist <= 3:
+            cleaned = clean_sense_text(top_sense)
+            if not cleaned.startswith("உடல் உறுப்பு"):
+                return f"உடல் உறுப்பு / பாதம் — {cleaned}", top_score, top_reasons
+            return cleaned, top_score, top_reasons
+
+        # Check if winning sense represents furniture / structural support
+        win_has_furniture = bool(
+            (top_toks & FURNITURE_INDICATORS) or
+            (top_stm & FURNITURE_INDICATORS) or
+            any(ind in top_sense for ind in FURNITURE_INDICATORS)
+        )
+        if win_has_furniture and closest_furniture and closest_furniture_dist <= 3:
+            cleaned = clean_sense_text(top_sense)
+            return f"நாற்காலியைத் தாங்கும் பகுதி — {cleaned}", top_score, top_reasons
 
         return clean_sense_text(top_sense), top_score, top_reasons
