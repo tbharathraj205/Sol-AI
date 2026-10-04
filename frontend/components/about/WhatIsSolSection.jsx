@@ -26,12 +26,12 @@ export default function WhatIsSolSection() {
               <BookOpen className="w-5 h-5 text-[#E5C158]" />
             </div>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif-tamil text-[#F7F3EA] tracking-tight">
-              What is <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F0D688] to-[#E5C158]">SOL AI</span>?
+              What is <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F0D688] to-[#E5C158]">சொல் AI</span>?
             </h2>
           </div>
 
           <p className="text-base sm:text-lg text-slate-300 font-sans-tamil leading-relaxed">
-            SOL AI is a Tamil Linguistic Intelligence Platform designed to analyze Tamil words beyond simple dictionary lookup. It combines lexical information, morphological analysis, semantic retrieval, contextual word-sense disambiguation, and Classical Tamil literary evidence.
+            சொல் AI is a Tamil Linguistic Intelligence Platform designed to analyze Tamil words beyond simple dictionary lookup. It combines lexical information, morphological analysis, semantic retrieval, contextual word-sense disambiguation, and Classical Tamil literary evidence.
           </p>
         </div>
       </div>

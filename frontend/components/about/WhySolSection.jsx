@@ -28,7 +28,7 @@ export default function WhySolSection() {
     <section className="w-full pt-6 sm:pt-7 space-y-[1mm]">
       {/* Section Heading */}
       <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif-tamil text-[#F7F3EA] tracking-tight">
-        Why <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F0D688] to-[#E5C158]">SOL AI</span>?
+        Why <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F0D688] to-[#E5C158]">சொல் AI</span>?
       </h2>
 
       {/* 3 Cards Grid with max 1mm gap */}

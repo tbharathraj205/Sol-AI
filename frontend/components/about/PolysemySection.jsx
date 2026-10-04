@@ -78,7 +78,7 @@ export default function PolysemySection() {
         <div className="flex items-center gap-3 lg:gap-4 shrink-0 w-full lg:w-auto lg:max-w-[260px] xl:max-w-[300px] pt-1 lg:pt-0">
           <div className="hidden lg:block w-px h-10 bg-[#C9A227]/40 shrink-0" />
           <p className="text-xs text-[#C5C2BA] font-sans-tamil leading-relaxed">
-            SOL AI uses surrounding context to distinguish between competing meanings of a polysemous Tamil word.
+            சொல் AI uses surrounding context to distinguish between competing meanings of a polysemous Tamil word.
           </p>
         </div>
       </div>

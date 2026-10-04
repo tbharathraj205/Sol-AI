@@ -34,7 +34,7 @@ export default function ClassicalLiteratureSection() {
 
         {/* Narrative Description */}
         <p className="text-sm sm:text-base md:text-lg text-slate-200 font-sans-tamil leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
-          SOL AI connects lexical analysis with Classical Tamil literary evidence, allowing users to explore not only what a word means, but how words and concepts appear in literary contexts.
+          சொல் AI connects lexical analysis with Classical Tamil literary evidence, allowing users to explore not only what a word means, but how words and concepts appear in literary contexts.
         </p>
 
         {/* Explore Resources CTA Link */}

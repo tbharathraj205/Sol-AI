@@ -87,7 +87,7 @@ const RESOURCES_DATA = [
     imagePng: "/resources/resource-madurai.png",
     alt: "Project Madurai — Classical Tamil literary retrieval layer",
     description:
-      "Provides the literary foundation for SOL AI's classical Tamil retrieval layer. SOL AI indexes selected canonical works for exact retrieval and uses calibrated semantic embeddings for conceptual discovery.",
+      "Provides the literary foundation for சொல் AI's classical Tamil retrieval layer. சொல் AI indexes selected canonical works for exact retrieval and uses calibrated semantic embeddings for conceptual discovery.",
     statsGrid: {
       works: "35 canonical works",
       releases: "31 releases",

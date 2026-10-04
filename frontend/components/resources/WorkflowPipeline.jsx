@@ -82,7 +82,7 @@ export default function WorkflowPipeline() {
           </div>
 
           <p className="text-xs sm:text-sm text-slate-200 font-sans-tamil max-w-xl md:text-right leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-            SOL AI combines morphological analysis, lexical resources, and
+            சொல் AI combines morphological analysis, lexical resources, and
             classical literature to provide meaningful contextual word analysis.
           </p>
         </div>

@@ -25,7 +25,7 @@ export default function AboutHero() {
         {/* Eyebrow */}
         <div className="inline-block">
           <span className="text-[11px] sm:text-xs font-semibold tracking-[0.28em] text-[#E5C158] uppercase font-sans drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
-            ABOUT SOL AI
+            ABOUT சொல் AI
           </span>
         </div>
 

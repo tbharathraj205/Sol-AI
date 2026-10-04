@@ -22,10 +22,10 @@ export default function AboutPage() {
           {/* 2. Built By — Prominent Team Section */}
           <BuiltBySection />
 
-          {/* 3. What is SOL AI? */}
+          {/* 3. What is சொல் AI? */}
           <WhatIsSolSection />
 
-          {/* 4. Why SOL AI? */}
+          {/* 4. Why சொல் AI? */}
           <WhySolSection />
 
           {/* 5. The Same Word. Different Meaning. */}

@@ -10,7 +10,7 @@ export default function ResourcesHero({ resourceCount = 6 }) {
       <div className="absolute inset-0 z-0">
         <Image
           src="/resources/resources-hero.png"
-          alt="SOL AI linguistic and literary knowledge landscape hero banner"
+          alt="சொல் AI linguistic and literary knowledge landscape hero banner"
           fill
           unoptimized
           priority
@@ -39,7 +39,7 @@ export default function ResourcesHero({ resourceCount = 6 }) {
 
         {/* Narrative Description */}
         <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-sans-tamil max-w-2xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
-          SOL AI brings together multiple Tamil linguistic, lexical,
+          சொல் AI brings together multiple Tamil linguistic, lexical,
           morphological, and literary resources to provide grounded analysis of
           words and their meanings.
         </p>
