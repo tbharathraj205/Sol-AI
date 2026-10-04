@@ -11,8 +11,8 @@ export default function Header({ isTransparent = false }) {
 
   const navLinks = [
     { href: "/", label: "Explore" },
-    { href: "/sources", label: "Resources" },
     { href: "/about", label: "About" },
+    { href: "/sources", label: "Resources" },
   ];
 
   const headerBg = isTransparent

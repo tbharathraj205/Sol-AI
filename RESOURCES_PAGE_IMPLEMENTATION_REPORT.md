@@ -16,12 +16,14 @@
 ### Newly Created Components
 - [`frontend/components/resources/ResourcesHero.jsx`](file:///c:/Vishwa/Projects/SOL_AI/frontend/components/resources/ResourcesHero.jsx):
   - Hero section featuring the South Indian temple and classical manuscript panorama.
+  - Background surface updated to `#020407` obsidian black (replacing navy blue).
   - Classical Tamil display typography: `சான்றுகள் & தரவு மூலங்கள்` with `(Evidence & Sources)` subtitle.
   - Dynamic integrated resources badge: `6 linguistic and literary resources currently integrated`.
   - Exact `resources-hero.png` used directly at 100% opacity without foggy/blurry overlays or filters.
 - [`frontend/components/resources/ResourceFilters.jsx`](file:///c:/Vishwa/Projects/SOL_AI/frontend/components/resources/ResourceFilters.jsx):
   - Horizontal filter row for `All`, `Lexical`, `Morphology`, `Semantic`, and `Literary`.
-  - Warm gold active accent (`#C9A227`) and dark translucent inactive surfaces with gold borders.
+  - Inactive surfaces styled with `#030508` dark obsidian glass with gold borders (replacing navy blue).
+  - Warm gold active accent (`#C9A227`).
   - Interactive resource counts displayed on badges.
   - Accessible keyboard navigation and mobile-friendly horizontal scrolling.
 - [`frontend/components/resources/ResourceCard.jsx`](file:///c:/Vishwa/Projects/SOL_AI/frontend/components/resources/ResourceCard.jsx):
