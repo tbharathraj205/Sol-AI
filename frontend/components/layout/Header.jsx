@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, User, Menu } from "lucide-react";
+import { Sun, User, Menu, Puzzle } from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
-export default function Header({ isTransparent = false }) {
+export default function Header({ isTransparent = false, showExtensionButton }) {
   const pathname = usePathname();
   const { toggleMobileOpen } = useSidebar();
+
+  const isExplore =
+    showExtensionButton !== undefined
+      ? showExtensionButton
+      : !pathname || pathname === "/" || pathname.startsWith("/search");
 
   const navLinks = [
     { href: "/", label: "Explore" },
@@ -67,21 +72,45 @@ export default function Header({ isTransparent = false }) {
             })}
           </nav>
 
-          {/* Right Utilities: Sun Theme Icon & Profile Avatar Icon */}
-          <div className="flex items-center space-x-3">
+          {/* Right: Explore page top-right Download சொல் AI Extension button UI */}
+          {isExplore ? (
             <button
-              className="p-2 rounded-full text-slate-300 hover:text-[#E5C158] hover:bg-white/10 transition cursor-pointer"
-              title="Toggle Theme"
+              type="button"
+              className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-1.5 rounded-full bg-black/70 hover:bg-black/85 backdrop-blur-md border border-[#C9A227]/60 hover:border-[#E5C158] shadow-[0_0_12px_rgba(201,162,39,0.2)] hover:shadow-[0_0_18px_rgba(201,162,39,0.35)] transition-all duration-200 cursor-pointer select-none group active:scale-[0.98] shrink-0"
+              title="Download சொல் AI Extension"
+              aria-label="Download சொல் AI Extension"
             >
-              <Sun className="w-4 h-4" />
+              {/* Gold SOL AI logo/icon on the LEFT */}
+              <img
+                src="/sol_emblem.png"
+                alt=""
+                className="w-4.5 h-4.5 sm:w-5 sm:h-5 object-contain shrink-0 group-hover:scale-105 transition-transform"
+              />
+
+              {/* Exact text */}
+              <span className="text-xs sm:text-[13px] font-medium text-[#E5C158] font-sans-tamil tracking-wide whitespace-nowrap leading-none flex items-center">
+                Download சொல் AI Extension
+              </span>
+
+              {/* Gold puzzle-piece icon on the RIGHT */}
+              <Puzzle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E5C158] fill-[#E5C158] shrink-0 group-hover:scale-110 transition-transform" />
             </button>
-            <button
-              className="p-2 rounded-full text-slate-300 hover:text-[#E5C158] hover:bg-white/10 transition cursor-pointer"
-              title="User Profile"
-            >
-              <User className="w-4 h-4" />
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <button
+                className="p-2 rounded-full text-slate-300 hover:text-[#E5C158] hover:bg-white/10 transition cursor-pointer"
+                title="Toggle Theme"
+              >
+                <Sun className="w-4 h-4" />
+              </button>
+              <button
+                className="p-2 rounded-full text-slate-300 hover:text-[#E5C158] hover:bg-white/10 transition cursor-pointer"
+                title="User Profile"
+              >
+                <User className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
