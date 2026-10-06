@@ -239,6 +239,19 @@ export default function ExtensionDemoPage() {
                   <p className="text-slate-400">Short actionable messages for unknown words, API timeouts, or offline backend state. Never dumps raw stack traces to the user.</p>
                 </div>
               </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between flex-wrap gap-4">
+                <a
+                  href="/sol-ai-extension.zip"
+                  download="sol-ai-extension.zip"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#C9A227] to-[#E5C158] hover:from-[#d8ae2b] hover:to-[#edd068] text-[#070D19] font-bold text-xs sm:text-sm shadow-lg shadow-[#C9A227]/20 transition-all transform hover:scale-[1.02] active:scale-[0.98] no-underline"
+                >
+                  Download சொல் AI Extension (.zip)
+                </a>
+                <span className="text-xs text-slate-400 font-sans-tamil">
+                  Chrome / Edge (Manifest V3)
+                </span>
+              </div>
             </div>
           </div>
         </div>

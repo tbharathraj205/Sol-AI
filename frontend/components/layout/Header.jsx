@@ -74,9 +74,10 @@ export default function Header({ isTransparent = false, showExtensionButton }) {
 
           {/* Right: Explore page top-right Download சொல் AI Extension button UI */}
           {isExplore ? (
-            <button
-              type="button"
-              className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-1.5 rounded-full bg-black/70 hover:bg-black/85 backdrop-blur-md border border-[#C9A227]/60 hover:border-[#E5C158] shadow-[0_0_12px_rgba(201,162,39,0.2)] hover:shadow-[0_0_18px_rgba(201,162,39,0.35)] transition-all duration-200 cursor-pointer select-none group active:scale-[0.98] shrink-0"
+            <a
+              href="/sol-ai-extension.zip"
+              download="sol-ai-extension.zip"
+              className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-1.5 rounded-full bg-black/70 hover:bg-black/85 backdrop-blur-md border border-[#C9A227]/60 hover:border-[#E5C158] shadow-[0_0_12px_rgba(201,162,39,0.2)] hover:shadow-[0_0_18px_rgba(201,162,39,0.35)] transition-all duration-200 cursor-pointer select-none group active:scale-[0.98] shrink-0 no-underline"
               title="Download சொல் AI Extension"
               aria-label="Download சொல் AI Extension"
             >
@@ -94,7 +95,7 @@ export default function Header({ isTransparent = false, showExtensionButton }) {
 
               {/* Gold puzzle-piece icon on the RIGHT */}
               <Puzzle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E5C158] fill-[#E5C158] shrink-0 group-hover:scale-110 transition-transform" />
-            </button>
+            </a>
           ) : (
             <div className="flex items-center space-x-3">
               <button

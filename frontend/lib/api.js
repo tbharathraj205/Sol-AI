@@ -1,10 +1,13 @@
 /**
  * SOL AI Frontend API Client.
  * Connects to SOL AI REST API backend.
- * Default API Base URL: http://localhost:8000
+ *
+ * In production (Vercel) and development, requests to /api/* are proxied
+ * to the backend (configured via SOL_BACKEND_URL in next.config.mjs).
+ * To bypass the proxy or specify a direct API host, configure NEXT_PUBLIC_SOL_API_BASE_URL.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_SOL_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = (process.env.NEXT_PUBLIC_SOL_API_BASE_URL || "").replace(/\/+$/, "");
 
 /**
  * Checks API server health
@@ -31,7 +34,7 @@ export async function checkApiHealth() {
 /**
  * Queries SOL AI engine for etymological & morphological evidence
  * @param {string} word Tamil query word or phrase
- * @param {string} provider Optional provider ('mock' or 'gemini')
+ * @param {string} provider Optional provider ('mock', 'gemini', or 'groq')
  */
 export async function querySolApi(word, provider = "mock") {
   const queryText = (word || "").trim();
@@ -41,7 +44,7 @@ export async function querySolApi(word, provider = "mock") {
 
   try {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 30000); // Increased timeout to 30s
+    const id = setTimeout(() => controller.abort(), 30000); // 30s timeout
     const res = await fetch(`${API_BASE_URL}/api/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,8 +71,9 @@ export async function querySolApi(word, provider = "mock") {
         isTimeout: true,
       };
     }
+    const target = API_BASE_URL || "/api";
     return {
-      error: "SOL AI backend server could not be reached. Ensure the API is running at " + API_BASE_URL,
+      error: `SOL AI backend server could not be reached. Ensure the API is reachable at ${target}.`,
       isOffline: true,
     };
   }
