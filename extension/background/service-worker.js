@@ -265,9 +265,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep response channel open for async sendResponse
   } else if (message.action === "OPEN_WEB_APP") {
     const query = message.query || "";
-    // Hardcoded to localhost:3000 for development. Can be made configurable.
-    const searchUrl = `http://localhost:3000/?q=${encodeURIComponent(query)}`;
-    chrome.tabs.create({ url: searchUrl });
+    (async () => {
+      const baseUrl = typeof getWebAppUrl === "function" ? await getWebAppUrl() : "https://sol-ai-cict.vercel.app";
+      const searchUrl = `${baseUrl}/?q=${encodeURIComponent(query)}`;
+      chrome.tabs.create({ url: searchUrl });
+    })();
   }
 });
 
